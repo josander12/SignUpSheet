@@ -459,11 +459,11 @@ button[type="submit"] {
 }
 
 .legend-swatch.childcare {
-  background: rgba(146, 43, 43, 0.1);
+  background: rgba(146, 43, 43, 0.34);
 }
 
 .legend-swatch.open {
-  background: rgba(241, 192, 0, 0.18);
+  background: rgba(241, 192, 0, 0.5);
 }
 
 .date-detail {
