@@ -14,6 +14,12 @@ Volunteers can choose any start and end time within those hours.
 
 Use the Flask app for the full server-backed experience:
 
+Install dependencies with `python -m pip install -r requirements.txt`. Create a
+local `.env` file in the project folder with `FLASK_SECRET_KEY` and
+`ADMIN_PASSWORD` set to your own secret values. The app loads this file at
+startup; existing environment variables (including Render settings) take
+precedence. The `.env` file is ignored by Git and must not be committed.
+
 ```bash
 python app.py
 ```

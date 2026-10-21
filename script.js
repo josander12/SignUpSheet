@@ -27,6 +27,7 @@ const endSelect = document.getElementById("end-time");
 const monthLabel = document.getElementById("month-label");
 const calendarGrid = document.getElementById("calendar-grid");
 const dateDetail = document.getElementById("date-detail");
+const dayDetailsDialog = document.getElementById("day-details-dialog");
 const adminPanel = document.getElementById("admin-panel");
 const adminLoginBox = document.getElementById("admin-login-box");
 const adminContent = document.getElementById("admin-content");
@@ -713,8 +714,7 @@ function renderSelectedDateDetail() {
         childCareMarkup ||
         `
         <p class="detail-text">
-          That date is not available for volunteering. Please choose a Monday,
-          Wednesday, or Saturday.
+          No help is needed on this day.
         </p>
       `
       }
@@ -739,10 +739,16 @@ function renderSelectedDateDetail() {
     summaryRows.push(
       ...generalSummaries.map(
         (slot) => `
-          <div class="slot-row">
-            <span>${formatTime(slot.start)} – ${formatTime(slot.end)}</span>
-            <strong>House-building help: ${slot.count} volunteer${slot.count > 1 ? "s" : ""}</strong>
-          </div>
+          <li class="volunteer-summary-row">
+            <div class="volunteer-shift">
+              <strong>House-building help</strong>
+              <span>${formatTime(slot.start)} – ${formatTime(slot.end)}</span>
+            </div>
+            <div class="volunteer-total">
+              <strong>${slot.count}</strong>
+              <span>volunteer${slot.count > 1 ? "s" : ""}</span>
+            </div>
+          </li>
         `,
       ),
     );
@@ -752,10 +758,16 @@ function renderSelectedDateDetail() {
     summaryRows.push(
       ...childcareSummaries.map(
         (slot) => `
-          <div class="slot-row">
-            <span>${formatTime(slot.start)} – ${formatTime(slot.end)}</span>
-            <strong>Child care help: ${slot.count} volunteer${slot.count > 1 ? "s" : ""}</strong>
-          </div>
+          <li class="volunteer-summary-row">
+            <div class="volunteer-shift">
+              <strong>Child care help</strong>
+              <span>${formatTime(slot.start)} – ${formatTime(slot.end)}</span>
+            </div>
+            <div class="volunteer-total">
+              <strong>${slot.count}</strong>
+              <span>volunteer${slot.count > 1 ? "s" : ""}</span>
+            </div>
+          </li>
         `,
       ),
     );
@@ -763,20 +775,20 @@ function renderSelectedDateDetail() {
 
   const currentVolunteersMarkup = summaryRows.length
     ? `
-      <div class="care-detail-block">
+      <section class="current-volunteers" aria-label="Current volunteers">
         <h4>Current volunteers</h4>
-        <div class="slot-summary">
+        <ul class="volunteer-summary-list">
           ${summaryRows.join("")}
-        </div>
-      </div>
+        </ul>
+      </section>
     `
     : "";
 
   dateDetail.innerHTML = `
     <h3>${formatDate(targetDate)}</h3>
     ${generalHelpMarkup}
-    ${currentVolunteersMarkup}
     ${childCareMarkup}
+    ${currentVolunteersMarkup}
   `;
 }
 
@@ -822,7 +834,7 @@ function renderCalendar() {
     const isSelected = value === (state.selectedDate || dateInput.value);
     const isVolunteerDay = Boolean(allowedWindow);
     const isPast = isPastDate(value);
-    const isDisabled = isPast || !isVolunteerDay;
+    const isDisabled = isPast;
     const badges = [];
 
     if (!isPast && activeChildcareNeeds.length > 0) {
@@ -943,6 +955,7 @@ function showCalendarPage() {
 }
 
 function showSignupPage() {
+  dayDetailsDialog.close();
   calendarPage.classList.add("hidden");
   signupPage.classList.remove("hidden");
   signupPage.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1175,12 +1188,6 @@ form.addEventListener("submit", async (event) => {
   showCalendarPage();
 });
 
-dateInput.addEventListener("change", () => {
-  const nextValue = dateInput.value;
-  if (!nextValue) return;
-  setSelectedDate(nextValue);
-});
-
 document.getElementById("back-to-calendar").addEventListener("click", () => {
   showCalendarPage();
 });
@@ -1252,12 +1259,20 @@ document.getElementById("next-month").addEventListener("click", () => {
   renderCalendar();
 });
 
+dayDetailsDialog.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    dayDetailsDialog.close();
+  }
+});
+
 calendarGrid.addEventListener("click", (event) => {
   const dayButton = event.target.closest(".calendar-day");
   if (!dayButton || dayButton.disabled) return;
 
   const pickedDate = dayButton.dataset.date;
   setSelectedDate(pickedDate, { openForm: false });
+  dayDetailsDialog.showModal();
 });
 
 dateDetail.addEventListener("click", async (event) => {
