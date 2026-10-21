@@ -1,9 +1,13 @@
+import logging
 import os
 import sqlite3
 
 from flask import Flask, g, jsonify, request, send_from_directory, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__, static_folder=".", static_url_path="")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+app.logger.setLevel(logging.INFO)
 
 secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not secret_key:
@@ -30,6 +34,23 @@ def close_db(_error):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+def get_client_ip():
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+@app.before_request
+def log_request_metadata():
+    app.logger.info(
+        "%s %s from %s",
+        request.method,
+        request.path,
+        get_client_ip(),
+    )
 
 
 def init_db():
