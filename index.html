@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>House Help Volunteer Sign-Up</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="top-actions">
+          <button
+            id="show-admin"
+            class="secondary admin-trigger"
+            type="button"
+            aria-label="Admin sign in"
+          >
+            Admin sign in
+          </button>
+          <button id="logout-admin" class="secondary hidden" type="button">
+            Log out
+          </button>
+        </div>
+
+        <div>
+          <p class="eyebrow">House build support</p>
+          <h1>Volunteer Sign-Up Sheet</h1>
+        </div>
+      </header>
+
+      <section
+        id="admin-panel"
+        class="panel admin-panel hidden"
+        aria-live="polite"
+      >
+        <div id="admin-login-box">
+          <h2>Admin access</h2>
+          <div class="field-row compact">
+            <label>
+              Password
+              <input
+                id="admin-password"
+                type="password"
+                placeholder="Enter admin password"
+              />
+            </label>
+          </div>
+          <button id="admin-login" type="button">Unlock admin view</button>
+        </div>
+
+        <div id="admin-content" class="hidden">
+          <div class="entries-header">
+            <h2>Volunteer details</h2>
+          </div>
+          <div id="admin-entries" class="admin-table-wrap"></div>
+
+          <div class="admin-childcare-section">
+            <h3>Child care need</h3>
+            <form id="admin-childcare-form" class="admin-childcare-form">
+              <div class="field-row two-up">
+                <label>
+                  Date
+                  <input
+                    id="childcare-date"
+                    name="childcare-date"
+                    type="date"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Notes
+                  <input
+                    id="childcare-notes"
+                    name="childcare-notes"
+                    type="text"
+                    placeholder="Optional details"
+                  />
+                </label>
+              </div>
+
+              <div class="field-row two-up">
+                <label>
+                  Start time
+                  <input
+                    id="childcare-start"
+                    name="childcare-start"
+                    type="time"
+                    required
+                  />
+                </label>
+
+                <label>
+                  End time
+                  <input
+                    id="childcare-end"
+                    name="childcare-end"
+                    type="time"
+                    required
+                  />
+                </label>
+              </div>
+
+              <button type="submit">Add child care need</button>
+            </form>
+
+            <div id="childcare-needs-list" class="childcare-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <div id="calendar-page">
+        <main class="layout">
+          <aside class="panel schedule-panel">
+            <h2>Volunteer windows</h2>
+            <ul class="schedule-list">
+              <li><strong>Monday:</strong> 11:45 AM – 5:45 PM</li>
+              <li><strong>Wednesday:</strong> 11:45 AM – 5:45 PM</li>
+              <li><strong>Saturday:</strong> 8:30 AM – 2:00 PM</li>
+            </ul>
+            <p class="helper-text">
+              Pick a specific date, then choose any time range within that
+              date's available hours.
+            </p>
+          </aside>
+        </main>
+
+        <section class="panel calendar-panel">
+          <div class="entries-header calendar-header">
+            <h2>Volunteer calendar</h2>
+            <div class="calendar-nav" aria-label="Choose month">
+              <button
+                id="previous-month"
+                class="secondary icon-button"
+                type="button"
+                aria-label="Previous month"
+              >
+                &lsaquo;
+              </button>
+              <strong id="month-label" class="month-label"></strong>
+              <button
+                id="next-month"
+                class="secondary icon-button"
+                type="button"
+                aria-label="Next month"
+              >
+                &rsaquo;
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="calendar-grid"
+            class="calendar-grid"
+            aria-live="polite"
+          ></div>
+          <div id="date-detail" class="date-detail"></div>
+        </section>
+      </div>
+
+      <section
+        id="signup-page"
+        class="panel signup-page hidden"
+        aria-live="polite"
+      >
+        <div class="signup-header">
+          <button id="back-to-calendar" class="secondary" type="button">
+            ← Back
+          </button>
+          <h2>Sign up to help</h2>
+        </div>
+
+        <form id="signup-form">
+          <div class="field-row">
+            <label>
+              Name
+              <input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Your name"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Help type
+              <select id="signup-type" name="signup-type">
+                <option value="general">Housebuilding help</option>
+                <option value="childcare">Child care support</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row two-up">
+            <label>
+              Volunteer date
+              <input id="date" name="date" type="date" required readonly />
+            </label>
+
+            <label>
+              Phone or email
+              <input
+                id="contact"
+                name="contact"
+                type="text"
+                placeholder="Phone or email"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="field-row two-up">
+            <label>
+              Start time
+              <select id="start-time" name="start-time" required></select>
+            </label>
+
+            <label>
+              End time
+              <select id="end-time" name="end-time" required></select>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Notes
+              <textarea id="notes" name="notes" rows="3"></textarea>
+            </label>
+          </div>
+
+          <button type="submit">Add volunteer slot</button>
+        </form>
+      </section>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
