@@ -419,6 +419,23 @@ async function loadEntries() {
   }
 }
 
+async function addEntry(entry) {
+  const response = await fetch("/api/entries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save signup.");
+  }
+
+  const result = await response.json();
+  const savedEntry = result.entry || entry;
+  state.entriesCache = [...state.entriesCache, savedEntry];
+  return savedEntry;
+}
+
 async function saveEntries(entries) {
   const response = await fetch("/api/entries", {
     method: "PUT",
@@ -1102,8 +1119,7 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const entries = [...state.entriesCache];
-    entries.push({
+    const entry = {
       id: generateEntryId(),
       name,
       date: dateValue,
@@ -1113,9 +1129,9 @@ form.addEventListener("submit", async (event) => {
       end: childcareEnd,
       type: "childcare",
       needId: need.id,
-    });
+    };
 
-    await saveEntries(entries);
+    await addEntry(entry);
     state.selectedDate = dateValue;
     state.signupType = "general";
     state.selectedNeedId = null;
@@ -1135,8 +1151,7 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  const entries = [...state.entriesCache];
-  entries.push({
+  const entry = {
     id: generateEntryId(),
     name,
     date: dateValue,
@@ -1145,9 +1160,9 @@ form.addEventListener("submit", async (event) => {
     start,
     end,
     type: "general",
-  });
+  };
 
-  await saveEntries(entries);
+  await addEntry(entry);
   state.selectedDate = dateValue;
   state.signupType = "general";
   state.selectedNeedId = null;

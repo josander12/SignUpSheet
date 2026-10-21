@@ -97,7 +97,7 @@ def health_check():
     return jsonify({"ok": True, "database": DATABASE_PATH})
 
 
-@app.route("/api/entries", methods=["GET", "PUT"])
+@app.route("/api/entries", methods=["GET", "POST", "PUT"])
 def entries_api():
     db = get_db()
 
@@ -106,6 +106,43 @@ def entries_api():
             "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
         ).fetchall()
         return jsonify([dict(row) for row in rows])
+
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "Entry must be an object."}), 400
+
+        entry = {
+            "id": payload.get("id"),
+            "name": payload.get("name", ""),
+            "date": payload.get("date"),
+            "contact": payload.get("contact", ""),
+            "notes": payload.get("notes", ""),
+            "start": payload.get("start"),
+            "end": payload.get("end"),
+            "type": payload.get("type", "general"),
+            "needId": payload.get("needId"),
+        }
+
+        db.execute(
+            """
+            INSERT INTO entries (id, name, date, contact, notes, start, end, type, need_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry["id"],
+                entry["name"],
+                entry["date"],
+                entry["contact"],
+                entry["notes"],
+                entry["start"],
+                entry["end"],
+                entry["type"],
+                entry["needId"],
+            ),
+        )
+        db.commit()
+        return jsonify({"ok": True, "entry": entry})
 
     payload = request.get_json(silent=True) or []
     if not isinstance(payload, list):
