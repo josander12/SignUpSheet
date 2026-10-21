@@ -4,8 +4,15 @@ import sqlite3
 from flask import Flask, g, jsonify, request, send_from_directory, session
 
 app = Flask(__name__, static_folder=".", static_url_path="")
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "househelp2026")
+
+secret_key = os.environ.get("FLASK_SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY must be set in the environment.")
+
+app.secret_key = secret_key
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD must be set in the environment.")
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(ROOT_DIR, "volunteer_app.db"))
 
