@@ -1,16 +1,164 @@
 import os
-from flask import Flask, jsonify, request, send_from_directory, session
+import sqlite3
+
+from flask import Flask, g, jsonify, request, send_from_directory, session
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "househelp2026")
-
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(ROOT_DIR, "volunteer_app.db"))
+
+
+def get_db():
+    if "db" not in g:
+        connection = sqlite3.connect(DATABASE_PATH)
+        connection.row_factory = sqlite3.Row
+        g.db = connection
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(_error):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS entries (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                date TEXT,
+                contact TEXT,
+                notes TEXT,
+                start TEXT,
+                end TEXT,
+                type TEXT,
+                need_id TEXT
+            )
+            """,
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS childcare_needs (
+                id TEXT PRIMARY KEY,
+                date TEXT,
+                start TEXT,
+                end TEXT,
+                notes TEXT
+            )
+            """,
+        )
+        connection.commit()
+
+
+init_db()
 
 
 @app.route("/")
 def index():
     return send_from_directory(ROOT_DIR, "index.html")
+
+
+@app.route("/api/health")
+def health_check():
+    return jsonify({"ok": True, "database": DATABASE_PATH})
+
+
+@app.route("/api/entries", methods=["GET", "PUT"])
+def entries_api():
+    db = get_db()
+
+    if request.method == "GET":
+        rows = db.execute(
+            "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
+        ).fetchall()
+        return jsonify([dict(row) for row in rows])
+
+    payload = request.get_json(silent=True) or []
+    if not isinstance(payload, list):
+        return jsonify({"error": "Entries must be a list."}), 400
+
+    db.execute("DELETE FROM entries")
+    for entry in payload:
+        db.execute(
+            """
+            INSERT INTO entries (id, name, date, contact, notes, start, end, type, need_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry.get("id"),
+                entry.get("name", ""),
+                entry.get("date"),
+                entry.get("contact", ""),
+                entry.get("notes", ""),
+                entry.get("start"),
+                entry.get("end"),
+                entry.get("type", "general"),
+                entry.get("needId"),
+            ),
+        )
+    db.commit()
+    rows = db.execute(
+        "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
+    ).fetchall()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.route("/api/entries/<entry_id>", methods=["DELETE"])
+def delete_entry(entry_id):
+    db = get_db()
+    db.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/childcare-needs", methods=["GET", "PUT"])
+def childcare_needs_api():
+    db = get_db()
+
+    if request.method == "GET":
+        rows = db.execute(
+            "SELECT id, date, start, end, notes FROM childcare_needs ORDER BY date, start"
+        ).fetchall()
+        return jsonify([dict(row) for row in rows])
+
+    payload = request.get_json(silent=True) or []
+    if not isinstance(payload, list):
+        return jsonify({"error": "Child care needs must be a list."}), 400
+
+    db.execute("DELETE FROM childcare_needs")
+    for need in payload:
+        db.execute(
+            """
+            INSERT INTO childcare_needs (id, date, start, end, notes)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                need.get("id"),
+                need.get("date"),
+                need.get("start"),
+                need.get("end"),
+                need.get("notes", ""),
+            ),
+        )
+    db.commit()
+    rows = db.execute(
+        "SELECT id, date, start, end, notes FROM childcare_needs ORDER BY date, start"
+    ).fetchall()
+    return jsonify([dict(row) for row in rows])
+
+
+@app.route("/api/childcare-needs/<need_id>", methods=["DELETE"])
+def delete_childcare_need(need_id):
+    db = get_db()
+    db.execute("DELETE FROM childcare_needs WHERE id = ?", (need_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin-status")
@@ -45,4 +193,4 @@ def serve_static(filename):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)

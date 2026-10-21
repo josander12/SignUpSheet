@@ -13,6 +13,8 @@ const state = {
   adminDetailPage: 1,
   signupType: "general",
   selectedNeedId: null,
+  entriesCache: [],
+  childCareNeedsCache: [],
 };
 
 const form = document.getElementById("signup-form");
@@ -138,28 +140,47 @@ function buildTimeOptions(start, end) {
 }
 
 function getDateEntries(dateValue) {
-  const entries = loadEntries();
-  return entries.filter((entry) => entry.date === dateValue);
+  return state.entriesCache.filter((entry) => entry.date === dateValue);
 }
 
-function loadChildCareNeeds() {
-  const saved = localStorage.getItem(childcareStorageKey);
-  const parsed = saved ? JSON.parse(saved) : [];
+async function loadChildCareNeeds() {
+  try {
+    const response = await fetch("/api/childcare-needs");
+    if (!response.ok) {
+      return state.childCareNeedsCache;
+    }
 
-  return parsed.map((need, index) => ({
-    ...need,
-    id:
-      need.id ||
-      `childcare-${need.date || "unknown"}-${need.start || "00:00"}-${need.end || "00:00"}-${index}`,
-  }));
+    const needs = await response.json();
+    state.childCareNeedsCache = needs.map((need, index) => ({
+      ...need,
+      id:
+        need.id ||
+        `childcare-${need.date || "unknown"}-${need.start || "00:00"}-${need.end || "00:00"}-${index}`,
+    }));
+    return state.childCareNeedsCache;
+  } catch (error) {
+    return state.childCareNeedsCache;
+  }
 }
 
-function saveChildCareNeeds(needs) {
-  localStorage.setItem(childcareStorageKey, JSON.stringify(needs));
+async function saveChildCareNeeds(needs) {
+  const response = await fetch("/api/childcare-needs", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(needs),
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save child care needs.");
+  }
+
+  const savedNeeds = await response.json();
+  state.childCareNeedsCache = savedNeeds;
+  return state.childCareNeedsCache;
 }
 
 function getChildCareNeedsForDate(dateValue) {
-  return loadChildCareNeeds().filter((need) => need.date === dateValue);
+  return state.childCareNeedsCache.filter((need) => need.date === dateValue);
 }
 
 function isChildCareNeedFilled(need) {
@@ -171,7 +192,7 @@ function isChildCareNeedFilled(need) {
     return false;
   }
 
-  const coveredIntervals = loadEntries()
+  const coveredIntervals = state.entriesCache
     .filter((entry) => {
       if (entry.date !== need.date || entry.type !== "childcare") {
         return false;
@@ -344,34 +365,56 @@ function generateEntryId() {
   return `entry-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function loadEntries() {
-  const saved = localStorage.getItem(storageKey);
-  const parsed = saved ? JSON.parse(saved) : [];
+async function loadEntries() {
+  try {
+    const response = await fetch("/api/entries");
+    if (!response.ok) {
+      return state.entriesCache;
+    }
 
-  return parsed.map((entry, index) => ({
-    ...entry,
-    id:
-      entry.id ||
-      `${entry.name || "volunteer"}-${entry.date || "unknown"}-${entry.start || "00:00"}-${entry.end || "00:00"}-${index}`,
-  }));
+    const entries = await response.json();
+    state.entriesCache = entries.map((entry, index) => ({
+      ...entry,
+      id:
+        entry.id ||
+        `${entry.name || "volunteer"}-${entry.date || "unknown"}-${entry.start || "00:00"}-${entry.end || "00:00"}-${index}`,
+    }));
+    return state.entriesCache;
+  } catch (error) {
+    return state.entriesCache;
+  }
 }
 
-function saveEntries(entries) {
-  localStorage.setItem(storageKey, JSON.stringify(entries));
+async function saveEntries(entries) {
+  const response = await fetch("/api/entries", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entries),
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save entries.");
+  }
+
+  const savedEntries = await response.json();
+  state.entriesCache = savedEntries;
+  return state.entriesCache;
 }
 
-function deleteEntry(entryId) {
-  const remainingEntries = loadEntries().filter(
-    (entry) => entry.id !== entryId,
-  );
-  saveEntries(remainingEntries);
+async function deleteEntry(entryId) {
+  const response = await fetch(`/api/entries/${entryId}`, { method: "DELETE" });
+  if (!response.ok) {
+    throw new Error("Unable to delete signup.");
+  }
+
+  state.entriesCache = state.entriesCache.filter((entry) => entry.id !== entryId);
   renderCalendar();
   renderSelectedDateDetail();
   renderAdminEntries();
 }
 
 function renderAdminEntries() {
-  const entries = loadEntries().sort((a, b) => {
+  const entries = [...state.entriesCache].sort((a, b) => {
     if (a.date === b.date) {
       return toMinutes(a.start) - toMinutes(b.start);
     }
@@ -875,7 +918,7 @@ function updateSignupTypeOptions(dateValue) {
 }
 
 function renderChildCareNeeds() {
-  const needs = loadChildCareNeeds().sort((a, b) => {
+  const needs = [...state.childCareNeedsCache].sort((a, b) => {
     if (a.date === b.date) {
       return toMinutes(a.start) - toMinutes(b.start);
     }
@@ -929,7 +972,7 @@ function initCalendarSelection() {
   renderChildCareNeeds();
 }
 
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const name = document.getElementById("name").value.trim();
@@ -956,7 +999,7 @@ form.addEventListener("submit", (event) => {
 
   if (state.signupType === "childcare") {
     const need = state.selectedNeedId
-      ? loadChildCareNeeds().find((item) => item.id === state.selectedNeedId)
+      ? [...state.childCareNeedsCache].find((item) => item.id === state.selectedNeedId)
       : getChildCareNeedsForDate(dateValue)[0];
 
     if (!need) {
@@ -978,7 +1021,7 @@ form.addEventListener("submit", (event) => {
       return;
     }
 
-    const entries = loadEntries();
+    const entries = [...state.entriesCache];
     entries.push({
       id: generateEntryId(),
       name,
@@ -991,7 +1034,7 @@ form.addEventListener("submit", (event) => {
       needId: need.id,
     });
 
-    saveEntries(entries);
+    await saveEntries(entries);
     state.selectedDate = dateValue;
     state.signupType = "general";
     state.selectedNeedId = null;
@@ -1011,7 +1054,7 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  const entries = loadEntries();
+  const entries = [...state.entriesCache];
   entries.push({
     id: generateEntryId(),
     name,
@@ -1023,7 +1066,7 @@ form.addEventListener("submit", (event) => {
     type: "general",
   });
 
-  saveEntries(entries);
+  await saveEntries(entries);
   state.selectedDate = dateValue;
   state.signupType = "general";
   state.selectedNeedId = null;
@@ -1121,7 +1164,7 @@ calendarGrid.addEventListener("click", (event) => {
   setSelectedDate(pickedDate, { openForm: false });
 });
 
-dateDetail.addEventListener("click", (event) => {
+dateDetail.addEventListener("click", async (event) => {
   const childcareDeleteButton = event.target.closest("[data-childcare-id]");
   if (childcareDeleteButton) {
     const childcareId = childcareDeleteButton.dataset.childcareId;
@@ -1130,8 +1173,8 @@ dateDetail.addEventListener("click", (event) => {
     const confirmed = window.confirm("Remove this child care need?");
     if (!confirmed) return;
 
-    const updatedNeeds = loadChildCareNeeds().filter((need) => need.id !== childcareId);
-    saveChildCareNeeds(updatedNeeds);
+    const updatedNeeds = [...state.childCareNeedsCache].filter((need) => need.id !== childcareId);
+    await saveChildCareNeeds(updatedNeeds);
     renderChildCareNeeds();
     renderCalendar();
     renderSelectedDateDetail();
@@ -1146,7 +1189,7 @@ dateDetail.addEventListener("click", (event) => {
     const confirmed = window.confirm("Remove this volunteer signup?");
     if (!confirmed) return;
 
-    deleteEntry(entryId);
+    await deleteEntry(entryId);
     return;
   }
 
@@ -1176,7 +1219,7 @@ dateDetail.addEventListener("click", (event) => {
   setSelectedDate(pickedDate, { openForm: true });
 });
 
-adminEntries.addEventListener("click", (event) => {
+adminEntries.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest(".delete-entry");
   if (!deleteButton) return;
 
@@ -1186,10 +1229,10 @@ adminEntries.addEventListener("click", (event) => {
   const confirmed = window.confirm("Remove this volunteer signup?");
   if (!confirmed) return;
 
-  deleteEntry(entryId);
+  await deleteEntry(entryId);
 });
 
-childcareNeedsList.addEventListener("click", (event) => {
+childcareNeedsList.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-childcare-id]");
   if (!deleteButton) return;
 
@@ -1199,14 +1242,14 @@ childcareNeedsList.addEventListener("click", (event) => {
   const confirmed = window.confirm("Remove this child care need?");
   if (!confirmed) return;
 
-  const updatedNeeds = loadChildCareNeeds().filter((need) => need.id !== childcareId);
-  saveChildCareNeeds(updatedNeeds);
+  const updatedNeeds = [...state.childCareNeedsCache].filter((need) => need.id !== childcareId);
+  await saveChildCareNeeds(updatedNeeds);
   renderChildCareNeeds();
   renderCalendar();
   renderSelectedDateDetail();
 });
 
-adminChildcareForm.addEventListener("submit", (event) => {
+adminChildcareForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const dateValue = childcareDateInput.value;
@@ -1224,7 +1267,7 @@ adminChildcareForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const needs = loadChildCareNeeds();
+  const needs = [...state.childCareNeedsCache];
   needs.push({
     id: generateEntryId(),
     date: dateValue,
@@ -1233,7 +1276,7 @@ adminChildcareForm.addEventListener("submit", (event) => {
     notes,
   });
 
-  saveChildCareNeeds(needs);
+  await saveChildCareNeeds(needs);
   adminChildcareForm.reset();
   renderChildCareNeeds();
   renderCalendar();
@@ -1261,9 +1304,19 @@ signupTypeSelect.addEventListener("change", (event) => {
   populateTimeSelects(dateInput.value);
 });
 
-initCalendarSelection();
-adminPanel.classList.add("hidden");
-adminLoginBox.classList.add("hidden");
-adminContent.classList.add("hidden");
-showAdminButton.classList.remove("hidden");
-logoutAdminButton.classList.add("hidden");
+async function refreshServerData() {
+  await loadEntries();
+  await loadChildCareNeeds();
+}
+
+async function initializeApp() {
+  await refreshServerData();
+  initCalendarSelection();
+  adminPanel.classList.add("hidden");
+  adminLoginBox.classList.add("hidden");
+  adminContent.classList.add("hidden");
+  showAdminButton.classList.remove("hidden");
+  logoutAdminButton.classList.add("hidden");
+}
+
+initializeApp();

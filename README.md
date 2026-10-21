@@ -12,10 +12,26 @@ Volunteers can choose any start and end time within those hours.
 
 ## Run locally
 
-Open `index.html` in a browser, or serve the folder with a simple static server:
+Use the Flask app for the full server-backed experience:
 
 ```bash
-python -m http.server 8000
+python app.py
 ```
 
-Then open http://localhost:8000.
+Then open http://localhost:5000.
+
+## Render deployment
+
+This project is ready for a Render Web Service using the included configuration:
+
+- [requirements.txt](requirements.txt)
+- [gunicorn.conf.py](gunicorn.conf.py)
+- [render.yaml](render.yaml)
+
+Use the following start command in Render:
+
+```bash
+gunicorn --config gunicorn.conf.py app:app
+```
+
+> Gunicorn is designed for Linux environments; it will not run natively on a Windows desktop because it depends on Unix socket support via `fcntl`. Render runs on Linux, so the app is set up for that deployment target.
