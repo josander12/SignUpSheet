@@ -48,66 +48,6 @@
           </div>
           <button id="admin-login" type="button">Unlock admin view</button>
         </div>
-
-        <div id="admin-content" class="hidden">
-          <div class="entries-header">
-            <h2>Volunteer details</h2>
-          </div>
-          <div id="admin-entries" class="admin-table-wrap"></div>
-
-          <div class="admin-childcare-section">
-            <h3>Child care need</h3>
-            <form id="admin-childcare-form" class="admin-childcare-form">
-              <div class="field-row two-up">
-                <label>
-                  Date
-                  <input
-                    id="childcare-date"
-                    name="childcare-date"
-                    type="date"
-                    required
-                  />
-                </label>
-
-                <label>
-                  Notes
-                  <input
-                    id="childcare-notes"
-                    name="childcare-notes"
-                    type="text"
-                    placeholder="Optional details"
-                  />
-                </label>
-              </div>
-
-              <div class="field-row two-up">
-                <label>
-                  Start time
-                  <input
-                    id="childcare-start"
-                    name="childcare-start"
-                    type="time"
-                    required
-                  />
-                </label>
-
-                <label>
-                  End time
-                  <input
-                    id="childcare-end"
-                    name="childcare-end"
-                    type="time"
-                    required
-                  />
-                </label>
-              </div>
-
-              <button type="submit">Add child care need</button>
-            </form>
-
-            <div id="childcare-needs-list" class="childcare-list"></div>
-          </div>
-        </div>
       </section>
 
       <div id="calendar-page">
@@ -122,6 +62,11 @@
             <p class="helper-text">
               Pick a specific date, then choose any time range within that
               date's available hours.
+            </p>
+            <br />
+            <p class="helper-text">
+              There is no limit to the number of volunteers who can sign up in a
+              given time slot.
             </p>
           </aside>
         </main>
@@ -150,14 +95,96 @@
             </div>
           </div>
 
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
           <div
             id="calendar-grid"
             class="calendar-grid"
             aria-live="polite"
           ></div>
+          <div class="calendar-legend" aria-label="Calendar legend">
+            <span class="legend-item">
+              <span class="legend-swatch childcare"></span>
+              Child care needed
+            </span>
+            <span class="legend-item">
+              <span class="legend-swatch open"></span>
+              Open slot
+            </span>
+          </div>
           <div id="date-detail" class="date-detail"></div>
         </section>
       </div>
+
+      <section
+        id="admin-content"
+        class="panel admin-panel hidden"
+        aria-live="polite"
+      >
+        <div class="entries-header">
+          <h2>Volunteer details</h2>
+        </div>
+        <div id="admin-entries" class="admin-table-wrap"></div>
+
+        <div class="admin-childcare-section">
+          <h3>Child care need</h3>
+          <form id="admin-childcare-form" class="admin-childcare-form">
+            <div class="field-row two-up">
+              <label>
+                Date
+                <input
+                  id="childcare-date"
+                  name="childcare-date"
+                  type="date"
+                  required
+                />
+              </label>
+
+              <label>
+                Notes
+                <input
+                  id="childcare-notes"
+                  name="childcare-notes"
+                  type="text"
+                  placeholder="Optional details"
+                />
+              </label>
+            </div>
+
+            <div class="field-row two-up">
+              <label>
+                Start time
+                <input
+                  id="childcare-start"
+                  name="childcare-start"
+                  type="time"
+                  required
+                />
+              </label>
+
+              <label>
+                End time
+                <input
+                  id="childcare-end"
+                  name="childcare-end"
+                  type="time"
+                  required
+                />
+              </label>
+            </div>
+
+            <button type="submit">Add child care need</button>
+          </form>
+
+          <div id="childcare-needs-list" class="childcare-list"></div>
+        </div>
+      </section>
 
       <section
         id="signup-page"

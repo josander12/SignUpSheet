@@ -61,7 +61,11 @@ function formatTime(timeString) {
 }
 
 function formatDate(dateString) {
-  const date = new Date(`${dateString}T12:00:00`);
+  const date = parseDateValue(dateString);
+  if (!date) {
+    return "Unknown date";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     month: "long",
@@ -75,6 +79,23 @@ function toDateInputValue(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function parseDateValue(dateValue) {
+  if (!dateValue) {
+    return null;
+  }
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day)
+  ) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
 }
 
 function getNextAvailableDate(date = new Date()) {
@@ -93,7 +114,11 @@ function getAllowedWindow(dateValue) {
     return null;
   }
 
-  const date = new Date(`${dateValue}T12:00:00`);
+  const date = parseDateValue(dateValue);
+  if (!date) {
+    return null;
+  }
+
   const weekday = date.getDay();
 
   if (weekday === 1 || weekday === 3) {
@@ -108,7 +133,11 @@ function getAllowedWindow(dateValue) {
 }
 
 function getWeekdayName(dateValue) {
-  const date = new Date(`${dateValue}T12:00:00`);
+  const date = parseDateValue(dateValue);
+  if (!date) {
+    return "Unknown day";
+  }
+
   return date.toLocaleDateString("en-US", { weekday: "long" });
 }
 
@@ -118,7 +147,11 @@ function isPastDate(dateValue) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const date = new Date(`${dateValue}T12:00:00`);
+  const date = parseDateValue(dateValue);
+  if (!date) {
+    return false;
+  }
+
   date.setHours(0, 0, 0, 0);
 
   return date < today;
@@ -244,7 +277,8 @@ function getActiveChildCareNeedsForDate(dateValue) {
 }
 
 function getGeneralVolunteerCount(dateValue) {
-  return getDateEntries(dateValue).filter((entry) => entry.type !== "childcare").length;
+  return getDateEntries(dateValue).filter((entry) => entry.type !== "childcare")
+    .length;
 }
 
 function summarizeSlotsForDate(dateValue) {
@@ -407,7 +441,9 @@ async function deleteEntry(entryId) {
     throw new Error("Unable to delete signup.");
   }
 
-  state.entriesCache = state.entriesCache.filter((entry) => entry.id !== entryId);
+  state.entriesCache = state.entriesCache.filter(
+    (entry) => entry.id !== entryId,
+  );
   renderCalendar();
   renderSelectedDateDetail();
   renderAdminEntries();
@@ -418,7 +454,7 @@ function renderAdminEntries() {
     if (a.date === b.date) {
       return toMinutes(a.start) - toMinutes(b.start);
     }
-    return new Date(`${a.date}T12:00:00`) - new Date(`${b.date}T12:00:00`);
+    return (parseDateValue(a.date) || 0) - (parseDateValue(b.date) || 0);
   });
 
   if (entries.length === 0) {
@@ -489,8 +525,8 @@ function renderSelectedDateDetail() {
       return;
     }
 
-    const entries = getDateEntries(targetDate).sort((a, b) =>
-      toMinutes(a.start) - toMinutes(b.start),
+    const entries = getDateEntries(targetDate).sort(
+      (a, b) => toMinutes(a.start) - toMinutes(b.start),
     );
 
     const details = [];
@@ -612,7 +648,9 @@ function renderSelectedDateDetail() {
     </button>
   `;
 
-  const activeChildCareNeeds = childcareNeeds.filter((need) => !isChildCareNeedFilled(need));
+  const activeChildCareNeeds = childcareNeeds.filter(
+    (need) => !isChildCareNeedFilled(need),
+  );
   const childCareMarkup = activeChildCareNeeds.length
     ? `
       <div class="care-detail-block">
@@ -644,17 +682,24 @@ function renderSelectedDateDetail() {
   if (!window) {
     dateDetail.innerHTML = `
       <h3>${formatDate(targetDate)}</h3>
-      ${childCareMarkup || `
+      ${
+        childCareMarkup ||
+        `
         <p class="detail-text">
           That date is not available for volunteering. Please choose a Monday,
           Wednesday, or Saturday.
         </p>
-      `}
+      `
+      }
     `;
     return;
   }
 
-  if (generalSummaries.length === 0 && childcareSummaries.length === 0 && activeChildCareNeeds.length === 0) {
+  if (
+    generalSummaries.length === 0 &&
+    childcareSummaries.length === 0 &&
+    activeChildCareNeeds.length === 0
+  ) {
     dateDetail.innerHTML = `
       <h3>${formatDate(targetDate)}</h3>
       <p class="detail-text">
@@ -713,15 +758,29 @@ function renderCalendar() {
     year: "numeric",
   });
 
+  const weekdayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekdayRow = document.querySelector(".calendar-weekdays");
+  if (weekdayRow) {
+    weekdayRow.innerHTML = weekdayNames
+      .map((name) => `<span class="calendar-weekday">${name}</span>`)
+      .join("");
+  }
+
   const gridStart = new Date(monthStart);
-  gridStart.setDate(1 - monthStart.getDay());
+  gridStart.setDate(1 - ((monthStart.getDay() + 6) % 7));
 
   const cells = [];
+  const visibleDates = [];
+  const cursor = new Date(gridStart);
 
-  for (let index = 0; index < 42; index += 1) {
-    const cellDate = new Date(gridStart);
-    cellDate.setDate(gridStart.getDate() + index);
+  while (visibleDates.length < 42) {
+    if (cursor.getDay() !== 0) {
+      visibleDates.push(new Date(cursor));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
 
+  for (const cellDate of visibleDates) {
     const value = toDateInputValue(cellDate);
     const allowedWindow = getAllowedWindow(value);
     const generalCount = getGeneralVolunteerCount(value);
@@ -735,19 +794,19 @@ function renderCalendar() {
 
     if (!isPast && activeChildcareNeeds.length > 0) {
       badges.push({
-        text: `${activeChildcareNeeds.length} child care`,
+        text: "Care",
         className: "day-count childcare",
       });
     }
 
     if (!isPast && generalCount > 0) {
       badges.push({
-        text: `${generalCount} house help${generalCount > 1 ? "s" : ""}`,
+        text: `${generalCount} help`,
         className: "day-count volunteer",
       });
     }
 
-    if (!isPast && badges.length === 0 && isVolunteerDay) {
+    if (!isPast && generalCount === 0 && isVolunteerDay) {
       badges.push({
         text: "Open",
         className: "day-count open",
@@ -786,7 +845,7 @@ function updateAdminView() {
 
   adminLoginBox.classList.add("hidden");
   adminContent.classList.remove("hidden");
-  adminPanel.classList.remove("hidden");
+  adminPanel.classList.add("hidden");
   showAdminButton.classList.add("hidden");
   logoutAdminButton.classList.remove("hidden");
   if (schedulePanel) {
@@ -922,7 +981,7 @@ function renderChildCareNeeds() {
     if (a.date === b.date) {
       return toMinutes(a.start) - toMinutes(b.start);
     }
-    return new Date(`${a.date}T12:00:00`) - new Date(`${b.date}T12:00:00`);
+    return (parseDateValue(a.date) || 0) - (parseDateValue(b.date) || 0);
   });
 
   if (!childcareNeedsList) {
@@ -999,7 +1058,9 @@ form.addEventListener("submit", async (event) => {
 
   if (state.signupType === "childcare") {
     const need = state.selectedNeedId
-      ? [...state.childCareNeedsCache].find((item) => item.id === state.selectedNeedId)
+      ? [...state.childCareNeedsCache].find(
+          (item) => item.id === state.selectedNeedId,
+        )
       : getChildCareNeedsForDate(dateValue)[0];
 
     if (!need) {
@@ -1015,7 +1076,11 @@ form.addEventListener("submit", async (event) => {
       return;
     }
 
-    const validationMessage = validateRange(childcareStart, childcareEnd, dateValue);
+    const validationMessage = validateRange(
+      childcareStart,
+      childcareEnd,
+      dateValue,
+    );
     if (validationMessage) {
       window.alert(validationMessage);
       return;
@@ -1173,7 +1238,9 @@ dateDetail.addEventListener("click", async (event) => {
     const confirmed = window.confirm("Remove this child care need?");
     if (!confirmed) return;
 
-    const updatedNeeds = [...state.childCareNeedsCache].filter((need) => need.id !== childcareId);
+    const updatedNeeds = [...state.childCareNeedsCache].filter(
+      (need) => need.id !== childcareId,
+    );
     await saveChildCareNeeds(updatedNeeds);
     renderChildCareNeeds();
     renderCalendar();
@@ -1200,7 +1267,9 @@ dateDetail.addEventListener("click", async (event) => {
     return;
   }
 
-  const childcareVolunteerButton = event.target.closest(".childcare-volunteer-button");
+  const childcareVolunteerButton = event.target.closest(
+    ".childcare-volunteer-button",
+  );
   if (childcareVolunteerButton) {
     const pickedDate = childcareVolunteerButton.dataset.date;
     const needId = childcareVolunteerButton.dataset.needId;
@@ -1242,7 +1311,9 @@ childcareNeedsList.addEventListener("click", async (event) => {
   const confirmed = window.confirm("Remove this child care need?");
   if (!confirmed) return;
 
-  const updatedNeeds = [...state.childCareNeedsCache].filter((need) => need.id !== childcareId);
+  const updatedNeeds = [...state.childCareNeedsCache].filter(
+    (need) => need.id !== childcareId,
+  );
   await saveChildCareNeeds(updatedNeeds);
   renderChildCareNeeds();
   renderCalendar();
@@ -1258,7 +1329,9 @@ adminChildcareForm.addEventListener("submit", async (event) => {
   const notes = childcareNotesInput.value.trim();
 
   if (!dateValue || !start || !end) {
-    window.alert("Please select a date and time range for the child care need.");
+    window.alert(
+      "Please select a date and time range for the child care need.",
+    );
     return;
   }
 
