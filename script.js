@@ -638,15 +638,25 @@ function renderSelectedDateDetail() {
   const summaries = summarizeSlotsForDate(targetDate);
   const generalSummaries = summaries.general;
   const childcareSummaries = summaries.childcare;
-  const actionButton = `
-    <button
-      type="button"
-      class="secondary volunteer-day-button"
-      data-date="${targetDate}"
-    >
-      Sign up
-    </button>
-  `;
+  const generalHelpMarkup = window
+    ? `
+      <div class="care-detail-block">
+        <h4>House building help needed</h4>
+        <div class="care-need-row">
+          <div>
+            <strong>${formatTime(window.start)} – ${formatTime(window.end)}</strong>
+          </div>
+          <button
+            type="button"
+            class="secondary volunteer-day-button"
+            data-date="${targetDate}"
+          >
+            Volunteer
+          </button>
+        </div>
+      </div>
+    `
+    : "";
 
   const activeChildCareNeeds = childcareNeeds.filter(
     (need) => !isChildCareNeedFilled(need),
@@ -702,10 +712,7 @@ function renderSelectedDateDetail() {
   ) {
     dateDetail.innerHTML = `
       <h3>${formatDate(targetDate)}</h3>
-      <p class="detail-text">
-        No volunteers are signed up yet for ${getWeekdayName(targetDate)}. Be the first to help.
-      </p>
-      ${actionButton}
+      ${generalHelpMarkup}
     `;
     return;
   }
@@ -737,13 +744,22 @@ function renderSelectedDateDetail() {
     );
   }
 
+  const currentVolunteersMarkup = summaryRows.length
+    ? `
+      <div class="care-detail-block">
+        <h4>Current volunteers</h4>
+        <div class="slot-summary">
+          ${summaryRows.join("")}
+        </div>
+      </div>
+    `
+    : "";
+
   dateDetail.innerHTML = `
     <h3>${formatDate(targetDate)}</h3>
-    <div class="slot-summary">
-      ${summaryRows.join("")}
-    </div>
+    ${generalHelpMarkup}
+    ${currentVolunteersMarkup}
     ${childCareMarkup}
-    ${actionButton}
   `;
 }
 

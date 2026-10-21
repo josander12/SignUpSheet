@@ -532,6 +532,10 @@ button[type="submit"] {
 .slot-summary {
   display: grid;
   gap: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.8rem 0.9rem;
 }
 
 .slot-row {
@@ -590,6 +594,10 @@ button[type="submit"] {
 
 .care-detail-block {
   margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.8rem 0.9rem;
 }
 
 .care-detail-block h4 {
