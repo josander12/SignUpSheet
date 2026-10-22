@@ -7,6 +7,24 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <div
+      id="app-toast"
+      class="app-toast"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      hidden
+    >
+      <span id="app-toast-message"></span>
+      <button
+        id="dismiss-toast"
+        class="toast-dismiss"
+        type="button"
+        aria-label="Dismiss notification"
+      >
+        &times;
+      </button>
+    </div>
     <div class="page-shell">
       <header class="topbar">
         <div class="top-actions">
@@ -28,6 +46,13 @@
           <h1>Volunteer Sign-Up Sheet</h1>
         </div>
       </header>
+
+      <div id="server-load-error" class="load-error" role="alert" hidden>
+        <p>We couldn't load the latest sign-up information.</p>
+        <button id="retry-server-load" class="secondary" type="button">
+          Retry
+        </button>
+      </div>
 
       <section
         id="admin-panel"

@@ -18,6 +18,10 @@ const state = {
 };
 
 const form = document.getElementById("signup-form");
+const appToast = document.getElementById("app-toast");
+const appToastMessage = document.getElementById("app-toast-message");
+const serverLoadError = document.getElementById("server-load-error");
+const retryServerLoadButton = document.getElementById("retry-server-load");
 const calendarPage = document.getElementById("calendar-page");
 const signupPage = document.getElementById("signup-page");
 const schedulePanel = document.querySelector(".schedule-panel");
@@ -178,23 +182,19 @@ function getDateEntries(dateValue) {
 }
 
 async function loadChildCareNeeds() {
-  try {
-    const response = await fetch("/api/childcare-needs");
-    if (!response.ok) {
-      return state.childCareNeedsCache;
-    }
-
-    const needs = await response.json();
-    state.childCareNeedsCache = needs.map((need, index) => ({
-      ...need,
-      id:
-        need.id ||
-        `childcare-${need.date || "unknown"}-${need.start || "00:00"}-${need.end || "00:00"}-${index}`,
-    }));
-    return state.childCareNeedsCache;
-  } catch (error) {
-    return state.childCareNeedsCache;
+  const response = await fetch("/api/childcare-needs");
+  if (!response.ok) {
+    throw new Error("Unable to load child care needs.");
   }
+
+  const needs = await response.json();
+  state.childCareNeedsCache = needs.map((need, index) => ({
+    ...need,
+    id:
+      need.id ||
+      `childcare-${need.date || "unknown"}-${need.start || "00:00"}-${need.end || "00:00"}-${index}`,
+  }));
+  return state.childCareNeedsCache;
 }
 
 async function saveChildCareNeeds(needs) {
@@ -401,23 +401,19 @@ function generateEntryId() {
 }
 
 async function loadEntries() {
-  try {
-    const response = await fetch("/api/entries");
-    if (!response.ok) {
-      return state.entriesCache;
-    }
-
-    const entries = await response.json();
-    state.entriesCache = entries.map((entry, index) => ({
-      ...entry,
-      id:
-        entry.id ||
-        `${entry.name || "volunteer"}-${entry.date || "unknown"}-${entry.start || "00:00"}-${entry.end || "00:00"}-${index}`,
-    }));
-    return state.entriesCache;
-  } catch (error) {
-    return state.entriesCache;
+  const response = await fetch("/api/entries");
+  if (!response.ok) {
+    throw new Error("Unable to load volunteer sign-ups.");
   }
+
+  const entries = await response.json();
+  state.entriesCache = entries.map((entry, index) => ({
+    ...entry,
+    id:
+      entry.id ||
+      `${entry.name || "volunteer"}-${entry.date || "unknown"}-${entry.start || "00:00"}-${entry.end || "00:00"}-${index}`,
+  }));
+  return state.entriesCache;
 }
 
 async function addEntry(entry) {
@@ -436,6 +432,68 @@ async function addEntry(entry) {
   state.entriesCache = [...state.entriesCache, savedEntry];
   return savedEntry;
 }
+
+async function submitVolunteerEntry(entry) {
+  try {
+    await addEntry(entry);
+    showToast("Your volunteer signup was submitted successfully.");
+    return true;
+  } catch (error) {
+    showToast("We couldn't submit your signup. Please try again.", "error");
+    return false;
+  }
+}
+
+let toastTimeoutId;
+
+function showToast(message, type = "success") {
+  window.clearTimeout(toastTimeoutId);
+  appToastMessage.textContent = message;
+  appToast.className = `app-toast ${type}`;
+  appToast.setAttribute("role", type === "error" ? "alert" : "status");
+  appToast.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+  appToast.hidden = false;
+  toastTimeoutId = window.setTimeout(() => {
+    appToast.hidden = true;
+  }, 5000);
+}
+
+async function runAdminMutation(action, successMessage) {
+  try {
+    await action();
+    if (successMessage) {
+      showToast(successMessage);
+    }
+  } catch (error) {
+    showToast("We couldn't save that change. Please try again.", "error");
+  }
+}
+
+async function retryLoadingServerData() {
+  retryServerLoadButton.disabled = true;
+  retryServerLoadButton.textContent = "Retrying...";
+
+  try {
+    await refreshServerData();
+    serverLoadError.hidden = true;
+    renderCalendar();
+    renderSelectedDateDetail();
+    renderChildCareNeeds();
+    renderAdminEntries();
+  } catch (error) {
+    serverLoadError.hidden = false;
+  } finally {
+    retryServerLoadButton.disabled = false;
+    retryServerLoadButton.textContent = "Retry";
+  }
+}
+
+retryServerLoadButton.addEventListener("click", retryLoadingServerData);
+
+document.getElementById("dismiss-toast").addEventListener("click", () => {
+  window.clearTimeout(toastTimeoutId);
+  appToast.hidden = true;
+});
 
 async function saveEntries(entries) {
   const response = await fetch("/api/entries", {
@@ -1144,7 +1202,7 @@ form.addEventListener("submit", async (event) => {
       needId: need.id,
     };
 
-    await addEntry(entry);
+    if (!(await submitVolunteerEntry(entry))) return;
     state.selectedDate = dateValue;
     state.signupType = "general";
     state.selectedNeedId = null;
@@ -1175,7 +1233,7 @@ form.addEventListener("submit", async (event) => {
     type: "general",
   };
 
-  await addEntry(entry);
+  if (!(await submitVolunteerEntry(entry))) return;
   state.selectedDate = dateValue;
   state.signupType = "general";
   state.selectedNeedId = null;
@@ -1203,9 +1261,13 @@ showAdminButton.addEventListener("click", () => {
 
 logoutAdminButton.addEventListener("click", async () => {
   try {
-    await fetch("/api/admin-logout", { method: "POST" });
+    const response = await fetch("/api/admin-logout", { method: "POST" });
+    if (!response.ok) {
+      throw new Error("Unable to log out.");
+    }
   } catch (error) {
-    // Ignore request failures here; the UI should still clear locally.
+    showToast("We couldn't log you out. Please try again.", "error");
+    return;
   }
 
   state.adminAuthenticated = false;
@@ -1235,6 +1297,12 @@ document.getElementById("admin-login").addEventListener("click", async () => {
     }
 
     state.adminAuthenticated = true;
+    try {
+      await refreshServerData();
+      serverLoadError.hidden = true;
+    } catch (error) {
+      serverLoadError.hidden = false;
+    }
     updateAdminView();
   } catch (error) {
     window.alert("Unable to reach the admin server. Please try again.");
@@ -1287,10 +1355,12 @@ dateDetail.addEventListener("click", async (event) => {
     const updatedNeeds = [...state.childCareNeedsCache].filter(
       (need) => need.id !== childcareId,
     );
-    await saveChildCareNeeds(updatedNeeds);
-    renderChildCareNeeds();
-    renderCalendar();
-    renderSelectedDateDetail();
+    await runAdminMutation(async () => {
+      await saveChildCareNeeds(updatedNeeds);
+      renderChildCareNeeds();
+      renderCalendar();
+      renderSelectedDateDetail();
+    }, "Child care need removed.");
     return;
   }
 
@@ -1302,7 +1372,7 @@ dateDetail.addEventListener("click", async (event) => {
     const confirmed = window.confirm("Remove this volunteer signup?");
     if (!confirmed) return;
 
-    await deleteEntry(entryId);
+    await runAdminMutation(() => deleteEntry(entryId), "Volunteer signup removed.");
     return;
   }
 
@@ -1344,7 +1414,7 @@ adminEntries.addEventListener("click", async (event) => {
   const confirmed = window.confirm("Remove this volunteer signup?");
   if (!confirmed) return;
 
-  await deleteEntry(entryId);
+  await runAdminMutation(() => deleteEntry(entryId), "Volunteer signup removed.");
 });
 
 childcareNeedsList.addEventListener("click", async (event) => {
@@ -1360,10 +1430,12 @@ childcareNeedsList.addEventListener("click", async (event) => {
   const updatedNeeds = [...state.childCareNeedsCache].filter(
     (need) => need.id !== childcareId,
   );
-  await saveChildCareNeeds(updatedNeeds);
-  renderChildCareNeeds();
-  renderCalendar();
-  renderSelectedDateDetail();
+  await runAdminMutation(async () => {
+    await saveChildCareNeeds(updatedNeeds);
+    renderChildCareNeeds();
+    renderCalendar();
+    renderSelectedDateDetail();
+  }, "Child care need removed.");
 });
 
 adminChildcareForm.addEventListener("submit", async (event) => {
@@ -1395,11 +1467,13 @@ adminChildcareForm.addEventListener("submit", async (event) => {
     notes,
   });
 
-  await saveChildCareNeeds(needs);
-  adminChildcareForm.reset();
-  renderChildCareNeeds();
-  renderCalendar();
-  renderSelectedDateDetail();
+  await runAdminMutation(async () => {
+    await saveChildCareNeeds(needs);
+    adminChildcareForm.reset();
+    renderChildCareNeeds();
+    renderCalendar();
+    renderSelectedDateDetail();
+  }, "Child care need added.");
 });
 
 signupTypeSelect.addEventListener("change", (event) => {
@@ -1424,18 +1498,43 @@ signupTypeSelect.addEventListener("change", (event) => {
 });
 
 async function refreshServerData() {
-  await loadEntries();
-  await loadChildCareNeeds();
+  const results = await Promise.allSettled([
+    loadEntries(),
+    loadChildCareNeeds(),
+  ]);
+  const failedRequest = results.find((result) => result.status === "rejected");
+  if (failedRequest) {
+    throw failedRequest.reason;
+  }
 }
 
 async function initializeApp() {
-  await refreshServerData();
+  try {
+    const response = await fetch("/api/admin-status", { cache: "no-store" });
+    if (response.ok) {
+      const result = await response.json();
+      state.adminAuthenticated = result.isAdmin === true;
+    }
+  } catch (error) {
+    state.adminAuthenticated = false;
+  }
+
+  try {
+    await refreshServerData();
+    serverLoadError.hidden = true;
+  } catch (error) {
+    serverLoadError.hidden = false;
+  }
   initCalendarSelection();
   adminPanel.classList.add("hidden");
   adminLoginBox.classList.add("hidden");
   adminContent.classList.add("hidden");
   showAdminButton.classList.remove("hidden");
   logoutAdminButton.classList.add("hidden");
+
+  if (state.adminAuthenticated) {
+    updateAdminView();
+  }
 }
 
 initializeApp();

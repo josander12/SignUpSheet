@@ -39,6 +39,66 @@ textarea {
   display: none !important;
 }
 
+.app-toast {
+  position: fixed;
+  z-index: 1000;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(34rem, calc(100% - 2rem));
+  padding: 0.85rem 0.9rem;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--success);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.app-toast[hidden] {
+  display: none;
+}
+
+.load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(146, 43, 43, 0.35);
+  border-left: 4px solid #922b2b;
+  border-radius: 8px;
+  background: #fff7f5;
+}
+
+.load-error[hidden] {
+  display: none;
+}
+
+.load-error p {
+  margin: 0;
+  color: #702020;
+}
+
+.app-toast.error {
+  border-left-color: #922b2b;
+}
+
+.toast-dismiss {
+  flex: 0 0 2rem;
+  width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
 .page-shell {
   width: 100%;
   max-width: 1100px;

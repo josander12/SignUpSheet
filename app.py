@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+from functools import wraps
 
 from dotenv import load_dotenv
 from flask import Flask, g, jsonify, request, send_from_directory, session
@@ -56,6 +57,16 @@ def log_request_metadata():
     )
 
 
+def admin_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if not session.get("admin"):
+            return jsonify({"error": "Admin login required."}), 401
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
 def init_db():
     with sqlite3.connect(DATABASE_PATH) as connection:
         connection.execute(
@@ -102,12 +113,20 @@ def health_check():
 
 @app.route("/api/entries", methods=["GET", "POST", "PUT"])
 def entries_api():
+    if request.method == "PUT" and not session.get("admin"):
+        return jsonify({"error": "Admin login required."}), 401
+
     db = get_db()
 
     if request.method == "GET":
-        rows = db.execute(
-            "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
-        ).fetchall()
+        if session.get("admin"):
+            rows = db.execute(
+                "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT id, date, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
+            ).fetchall()
         return jsonify([dict(row) for row in rows])
 
     if request.method == "POST":
@@ -178,6 +197,7 @@ def entries_api():
 
 
 @app.route("/api/entries/<entry_id>", methods=["DELETE"])
+@admin_required
 def delete_entry(entry_id):
     db = get_db()
     db.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
@@ -187,6 +207,9 @@ def delete_entry(entry_id):
 
 @app.route("/api/childcare-needs", methods=["GET", "PUT"])
 def childcare_needs_api():
+    if request.method == "PUT" and not session.get("admin"):
+        return jsonify({"error": "Admin login required."}), 401
+
     db = get_db()
 
     if request.method == "GET":
@@ -222,6 +245,7 @@ def childcare_needs_api():
 
 
 @app.route("/api/childcare-needs/<need_id>", methods=["DELETE"])
+@admin_required
 def delete_childcare_need(need_id):
     db = get_db()
     db.execute("DELETE FROM childcare_needs WHERE id = ?", (need_id,))
