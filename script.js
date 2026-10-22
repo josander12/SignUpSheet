@@ -328,18 +328,14 @@ function populateTimeSelects(dateValue) {
   }
 
   const times = buildTimeOptions(window.start, window.end);
-  startSelect.innerHTML = times
-    .map((time) => `<option value="${time}">${formatTime(time)}</option>`)
-    .join("");
-
-  endSelect.innerHTML = times
-    .map((time) => `<option value="${time}">${formatTime(time)}</option>`)
-    .join("");
+  startSelect.innerHTML = `
+    <option value="">Choose a start time</option>
+    ${times.map((time) => `<option value="${time}">${formatTime(time)}</option>`).join("")}
+  `;
+  endSelect.innerHTML = '<option value="">Choose an end time</option>';
 
   startSelect.disabled = false;
-  endSelect.disabled = false;
-  startSelect.value = times[0];
-  updateEndOptions();
+  endSelect.disabled = true;
 }
 
 function updateEndOptions() {
@@ -347,6 +343,12 @@ function updateEndOptions() {
   const window = getCurrentTimeWindow(dateInput.value);
 
   if (!window) {
+    return;
+  }
+
+  if (!startTime) {
+    endSelect.innerHTML = '<option value="">Choose an end time</option>';
+    endSelect.disabled = true;
     return;
   }
 
@@ -361,12 +363,13 @@ function updateEndOptions() {
     return;
   }
 
-  endSelect.innerHTML = validEndTimes
-    .map((time) => `<option value="${time}">${formatTime(time)}</option>`)
-    .join("");
+  endSelect.innerHTML = `
+    <option value="">Choose an end time</option>
+    ${validEndTimes.map((time) => `<option value="${time}">${formatTime(time)}</option>`).join("")}
+  `;
 
   endSelect.disabled = false;
-  endSelect.value = validEndTimes[validEndTimes.length - 1];
+  endSelect.value = "";
 }
 
 function generateEntryId() {
