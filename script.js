@@ -1,11 +1,3 @@
-const schedule = {
-  monday: { label: "Monday", start: "11:45", end: "17:45" },
-  wednesday: { label: "Wednesday", start: "11:45", end: "17:45" },
-  saturday: { label: "Saturday", start: "08:30", end: "14:00" },
-};
-
-const storageKey = "house-help-signups-v2";
-const childcareStorageKey = "house-help-childcare-needs-v1";
 const state = {
   currentMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   selectedDate: null,
@@ -129,15 +121,6 @@ function getAllowedWindow(dateValue) {
   }
 
   return null;
-}
-
-function getWeekdayName(dateValue) {
-  const date = parseDateValue(dateValue);
-  if (!date) {
-    return "Unknown day";
-  }
-
-  return date.toLocaleDateString("en-US", { weekday: "long" });
 }
 
 function isPastDate(dateValue) {
@@ -488,22 +471,6 @@ document.getElementById("dismiss-toast").addEventListener("click", () => {
   appToast.hidden = true;
 });
 
-async function saveEntries(entries) {
-  const response = await fetch("/api/entries", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(entries),
-  });
-
-  if (!response.ok) {
-    throw new Error("Unable to save entries.");
-  }
-
-  const savedEntries = await response.json();
-  state.entriesCache = savedEntries;
-  return state.entriesCache;
-}
-
 async function deleteEntry(entryId) {
   const response = await fetch(`/api/entries/${entryId}`, { method: "DELETE" });
   if (!response.ok) {
@@ -678,7 +645,9 @@ function renderSelectedDateDetail() {
       .join("");
 
     if (entries.length === 0) {
-      details.unshift(`<p class="detail-text admin-no-volunteers">No volunteers for this day.</p>`);
+      details.unshift(
+        `<p class="detail-text admin-no-volunteers">No volunteers for this day.</p>`,
+      );
     }
 
     dateDetail.innerHTML = `
@@ -912,7 +881,7 @@ function renderCalendar() {
       });
     }
 
-    if (!isPast && generalCount === 0 && isVolunteerDay) {
+    if (!isPast && isVolunteerDay) {
       badges.push({
         text: "Open",
         className: "day-count open",
@@ -1327,7 +1296,10 @@ dateDetail.addEventListener("click", async (event) => {
     const confirmed = window.confirm("Remove this volunteer signup?");
     if (!confirmed) return;
 
-    await runAdminMutation(() => deleteEntry(entryId), "Volunteer signup removed.");
+    await runAdminMutation(
+      () => deleteEntry(entryId),
+      "Volunteer signup removed.",
+    );
     return;
   }
 
@@ -1369,7 +1341,10 @@ adminEntries.addEventListener("click", async (event) => {
   const confirmed = window.confirm("Remove this volunteer signup?");
   if (!confirmed) return;
 
-  await runAdminMutation(() => deleteEntry(entryId), "Volunteer signup removed.");
+  await runAdminMutation(
+    () => deleteEntry(entryId),
+    "Volunteer signup removed.",
+  );
 });
 
 dateDetail.addEventListener("submit", async (event) => {

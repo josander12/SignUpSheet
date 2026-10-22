@@ -111,11 +111,8 @@ def health_check():
     return jsonify({"ok": True, "database": DATABASE_PATH})
 
 
-@app.route("/api/entries", methods=["GET", "POST", "PUT"])
+@app.route("/api/entries", methods=["GET", "POST"])
 def entries_api():
-    if request.method == "PUT" and not session.get("admin"):
-        return jsonify({"error": "Admin login required."}), 401
-
     db = get_db()
 
     if request.method == "GET":
@@ -165,35 +162,6 @@ def entries_api():
         )
         db.commit()
         return jsonify({"ok": True, "entry": entry})
-
-    payload = request.get_json(silent=True) or []
-    if not isinstance(payload, list):
-        return jsonify({"error": "Entries must be a list."}), 400
-
-    db.execute("DELETE FROM entries")
-    for entry in payload:
-        db.execute(
-            """
-            INSERT INTO entries (id, name, date, contact, notes, start, end, type, need_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                entry.get("id"),
-                entry.get("name", ""),
-                entry.get("date"),
-                entry.get("contact", ""),
-                entry.get("notes", ""),
-                entry.get("start"),
-                entry.get("end"),
-                entry.get("type", "general"),
-                entry.get("needId"),
-            ),
-        )
-    db.commit()
-    rows = db.execute(
-        "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
-    ).fetchall()
-    return jsonify([dict(row) for row in rows])
 
 
 @app.route("/api/entries/<entry_id>", methods=["DELETE"])
