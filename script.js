@@ -37,12 +37,6 @@ const adminLoginBox = document.getElementById("admin-login-box");
 const adminContent = document.getElementById("admin-content");
 const adminEntries = document.getElementById("admin-entries");
 const adminPasswordInput = document.getElementById("admin-password");
-const adminChildcareForm = document.getElementById("admin-childcare-form");
-const childcareDateInput = document.getElementById("childcare-date");
-const childcareStartInput = document.getElementById("childcare-start");
-const childcareEndInput = document.getElementById("childcare-end");
-const childcareNotesInput = document.getElementById("childcare-notes");
-const childcareNeedsList = document.getElementById("childcare-needs-list");
 const signupTypeSelect = document.getElementById("signup-type");
 const showAdminButton = document.getElementById("show-admin");
 const logoutAdminButton = document.getElementById("logout-admin");
@@ -478,7 +472,6 @@ async function retryLoadingServerData() {
     serverLoadError.hidden = true;
     renderCalendar();
     renderSelectedDateDetail();
-    renderChildCareNeeds();
     renderAdminEntries();
   } catch (error) {
     serverLoadError.hidden = false;
@@ -607,37 +600,6 @@ function renderSelectedDateDetail() {
 
     const details = [];
 
-    if (childcareNeeds.length > 0) {
-      details.push(`
-        <div class="care-detail-block">
-          <h4>Child care need</h4>
-          <div class="admin-detail-list">
-            ${childcareNeeds
-              .map(
-                (need) => `
-                  <div class="admin-detail-row">
-                    <div>
-                      <strong>${formatTime(need.start)} – ${formatTime(need.end)}</strong>
-                      ${need.notes ? `<div>${need.notes}</div>` : ""}
-                    </div>
-                    <button
-                      type="button"
-                      class="delete-entry admin-delete-entry"
-                      data-childcare-id="${need.id}"
-                      aria-label="Delete child care need"
-                      title="Delete child care need"
-                    >
-                      🗑
-                    </button>
-                  </div>
-                `,
-              )
-              .join("")}
-          </div>
-        </div>
-      `);
-    }
-
     if (entries.length > 0) {
       const pageSize = 8;
       const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
@@ -693,19 +655,60 @@ function renderSelectedDateDetail() {
       `);
     }
 
-    if (details.length === 0) {
-      dateDetail.innerHTML = `
-        <h3>${formatDate(targetDate)}</h3>
-        <p class="detail-text">
-          No volunteers or child care needs are scheduled for ${getWeekdayName(targetDate)}.
-        </p>
-      `;
-      return;
+    const childcareRows = childcareNeeds
+      .map(
+        (need) => `
+          <div class="admin-detail-row">
+            <div>
+              <strong>${formatTime(need.start)} – ${formatTime(need.end)}</strong>
+              ${need.notes ? `<div>${need.notes}</div>` : ""}
+            </div>
+            <button
+              type="button"
+              class="delete-entry admin-delete-entry"
+              data-childcare-id="${need.id}"
+              aria-label="Delete child care need"
+              title="Delete child care need"
+            >
+              🗑
+            </button>
+          </div>
+        `,
+      )
+      .join("");
+
+    if (entries.length === 0) {
+      details.unshift(`<p class="detail-text admin-no-volunteers">No volunteers for this day.</p>`);
     }
 
     dateDetail.innerHTML = `
       <h3>${formatDate(targetDate)}</h3>
       ${details.join("")}
+      <section class="care-detail-block admin-day-care">
+        <h4>Child care needs</h4>
+        ${
+          childcareRows
+            ? `<div class="admin-detail-list">${childcareRows}</div>`
+            : '<p class="detail-text">No child care needs scheduled.</p>'
+        }
+        <form class="admin-childcare-form" data-date="${targetDate}">
+          <div class="field-row two-up">
+            <label>
+              Start time
+              <input name="start" type="time" required />
+            </label>
+            <label>
+              End time
+              <input name="end" type="time" required />
+            </label>
+          </div>
+          <label class="admin-care-notes">
+            Notes
+            <input name="notes" type="text" placeholder="Optional details" />
+          </label>
+          <button type="submit">Add child care need</button>
+        </form>
+      </section>
     `;
     return;
   }
@@ -955,7 +958,6 @@ function updateAdminView() {
     schedulePanel.classList.add("hidden");
   }
   renderAdminEntries();
-  renderChildCareNeeds();
   renderCalendar();
   renderSelectedDateDetail();
 }
@@ -1080,51 +1082,6 @@ function updateSignupTypeOptions(dateValue) {
   signupTypeSelect.value = state.signupType;
 }
 
-function renderChildCareNeeds() {
-  const needs = [...state.childCareNeedsCache].sort((a, b) => {
-    if (a.date === b.date) {
-      return toMinutes(a.start) - toMinutes(b.start);
-    }
-    return (parseDateValue(a.date) || 0) - (parseDateValue(b.date) || 0);
-  });
-
-  if (!childcareNeedsList) {
-    return;
-  }
-
-  if (needs.length === 0) {
-    childcareNeedsList.innerHTML = `
-      <div class="empty-state">
-        No child care needs added yet.
-      </div>
-    `;
-    return;
-  }
-
-  childcareNeedsList.innerHTML = needs
-    .map(
-      (need) => `
-        <div class="care-row">
-          <div>
-            <strong>${formatDate(need.date)}</strong>
-            <div>${formatTime(need.start)} – ${formatTime(need.end)}</div>
-            ${need.notes ? `<div>${need.notes}</div>` : ""}
-          </div>
-          <button
-            type="button"
-            class="delete-entry"
-            data-childcare-id="${need.id}"
-            aria-label="Delete child care need"
-            title="Delete child care need"
-          >
-            🗑
-          </button>
-        </div>
-      `,
-    )
-    .join("");
-}
-
 function initCalendarSelection() {
   state.selectedDate = null;
   dateInput.value = "";
@@ -1132,7 +1089,6 @@ function initCalendarSelection() {
   populateTimeSelects(getNextAvailableDate(new Date()));
   renderCalendar();
   renderSelectedDateDetail();
-  renderChildCareNeeds();
 }
 
 form.addEventListener("submit", async (event) => {
@@ -1357,7 +1313,6 @@ dateDetail.addEventListener("click", async (event) => {
     );
     await runAdminMutation(async () => {
       await saveChildCareNeeds(updatedNeeds);
-      renderChildCareNeeds();
       renderCalendar();
       renderSelectedDateDetail();
     }, "Child care need removed.");
@@ -1417,34 +1372,16 @@ adminEntries.addEventListener("click", async (event) => {
   await runAdminMutation(() => deleteEntry(entryId), "Volunteer signup removed.");
 });
 
-childcareNeedsList.addEventListener("click", async (event) => {
-  const deleteButton = event.target.closest("[data-childcare-id]");
-  if (!deleteButton) return;
+dateDetail.addEventListener("submit", async (event) => {
+  const childcareForm = event.target.closest(".admin-childcare-form");
+  if (!childcareForm) return;
 
-  const childcareId = deleteButton.dataset.childcareId;
-  if (!childcareId) return;
-
-  const confirmed = window.confirm("Remove this child care need?");
-  if (!confirmed) return;
-
-  const updatedNeeds = [...state.childCareNeedsCache].filter(
-    (need) => need.id !== childcareId,
-  );
-  await runAdminMutation(async () => {
-    await saveChildCareNeeds(updatedNeeds);
-    renderChildCareNeeds();
-    renderCalendar();
-    renderSelectedDateDetail();
-  }, "Child care need removed.");
-});
-
-adminChildcareForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const dateValue = childcareDateInput.value;
-  const start = childcareStartInput.value;
-  const end = childcareEndInput.value;
-  const notes = childcareNotesInput.value.trim();
+  const dateValue = childcareForm.dataset.date;
+  const start = childcareForm.elements.start.value;
+  const end = childcareForm.elements.end.value;
+  const notes = childcareForm.elements.notes.value.trim();
 
   if (!dateValue || !start || !end) {
     window.alert(
@@ -1469,8 +1406,7 @@ adminChildcareForm.addEventListener("submit", async (event) => {
 
   await runAdminMutation(async () => {
     await saveChildCareNeeds(needs);
-    adminChildcareForm.reset();
-    renderChildCareNeeds();
+    childcareForm.reset();
     renderCalendar();
     renderSelectedDateDetail();
   }, "Child care need added.");

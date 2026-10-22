@@ -613,6 +613,23 @@ body:has(#day-details-dialog[open]) {
   gap: 0.75rem;
 }
 
+.admin-no-volunteers {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--muted);
+  border-radius: 4px;
+  background: var(--panel-strong);
+  font-weight: 600;
+}
+
+.admin-day-care .admin-childcare-form {
+  margin-top: 1rem;
+}
+
+.admin-day-care .admin-care-notes {
+  margin-bottom: 1rem;
+}
+
 .admin-detail-row {
   display: flex;
   justify-content: space-between;
