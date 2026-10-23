@@ -5,9 +5,14 @@ import re
 import secrets
 import sqlite3
 import time
+import base64
 from contextlib import closing
-from datetime import date
+from datetime import date, datetime, timedelta
 from functools import wraps
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -37,6 +42,8 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 if not ADMIN_PASSWORD:
     raise RuntimeError("ADMIN_PASSWORD must be set in the environment.")
 DATABASE_PATH = os.environ.get("DATABASE_PATH", os.path.join(ROOT_DIR, "volunteer_app.db"))
+VOLUNTEER_TIMEZONE = ZoneInfo("America/Denver")
+SMS_ALERTS_PER_DAY_LIMIT = 10
 
 
 def get_db():
@@ -67,7 +74,9 @@ def log_request_metadata():
         get_client_ip(),
     )
     if request.path.startswith("/api/") and request.method in {"POST", "PUT", "DELETE"}:
-        if request.path != "/api/entries":
+        if request.path not in {
+            "/api/entries", "/api/internal/shift-reminders",
+        }:
             expected = session.get("csrf_token")
             supplied = request.headers.get("X-CSRF-Token", "")
             if not expected or not secrets.compare_digest(expected.encode(), supplied.encode()):
@@ -115,6 +124,89 @@ def text_field(payload, key, limit, required=False):
     if required and not value:
         raise ValueError(f"{key} is required.")
     return value
+
+
+def phone_field(payload):
+    value = text_field(payload, "contact", 30)
+    if not value:
+        return ""
+    if not re.fullmatch(r"\+?[0-9() .-]+", value):
+        raise ValueError("Please provide a valid 10-digit phone number.")
+    digits = re.sub(r"[^0-9]", "", value)
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if not re.fullmatch(r"[2-9][0-9]{2}[2-9][0-9]{6}", digits):
+        raise ValueError("Please provide a valid 10-digit phone number.")
+    return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+
+
+def internal_job_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        expected = os.environ.get("REMINDER_JOB_TOKEN", "")
+        authorization = request.headers.get("Authorization", "")
+        if not authorization.startswith("Bearer ") or not expected:
+            return jsonify({"error": "Unauthorized."}), 401
+        if not secrets.compare_digest(
+            authorization.removeprefix("Bearer ").encode(), expected.encode()
+        ):
+            return jsonify({"error": "Unauthorized."}), 401
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def twilio_sms_configured():
+    return twilio_sender_configured() and bool(os.environ.get("SMS_ALERT_PHONE"))
+
+
+def twilio_sender_configured():
+    return all(
+        os.environ.get(key)
+        for key in (
+            "TWILIO_ACCOUNT_SID",
+            "TWILIO_AUTH_TOKEN",
+            "TWILIO_FROM_NUMBER",
+        )
+    )
+
+
+def send_signup_sms(entry):
+    message_body = (
+        f"New signup: {entry['name'][:50]} - "
+        f"{'Child care' if entry['type'] == 'childcare' else 'General'}, "
+        f"{entry['date']} {entry['start']}-{entry['end']}."
+    )
+    send_twilio_sms(os.environ["SMS_ALERT_PHONE"], message_body)
+
+
+def send_twilio_sms(destination, message_body):
+    account_sid = os.environ["TWILIO_ACCOUNT_SID"]
+    auth_token = os.environ["TWILIO_AUTH_TOKEN"]
+    request = Request(
+        f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
+        data=urlencode(
+            {
+                "To": destination,
+                "From": os.environ["TWILIO_FROM_NUMBER"],
+                "Body": message_body,
+            }
+        ).encode(),
+        headers={
+            "Authorization": "Basic "
+            + base64.b64encode(f"{account_sid}:{auth_token}".encode()).decode(),
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            if response.status not in (200, 201):
+                raise RuntimeError(f"Twilio returned unexpected HTTP status {response.status}.")
+    except HTTPError as error:
+        raise RuntimeError(f"Twilio returned HTTP status {error.code}.") from error
+    except URLError as error:
+        raise RuntimeError("Could not connect to Twilio.") from error
 
 
 def validate_schedule(payload):
@@ -201,6 +293,36 @@ def init_db():
             )
             """,
         )
+        entry_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(entries)")
+        }
+        if "reminder_opt_in" not in entry_columns:
+            connection.execute(
+                "ALTER TABLE entries ADD COLUMN reminder_opt_in INTEGER NOT NULL DEFAULT 0"
+            )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS shift_reminder_attempts (
+                signup_id TEXT PRIMARY KEY,
+                attempted_at REAL NOT NULL,
+                status TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sms_notification_attempts (
+                signup_id TEXT PRIMARY KEY,
+                local_date TEXT NOT NULL,
+                attempted_at REAL NOT NULL,
+                status TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS sms_notification_attempts_date "
+            "ON sms_notification_attempts (local_date)"
+        )
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS childcare_needs (
@@ -235,7 +357,8 @@ def entries_api():
     if request.method == "GET":
         if session.get("admin"):
             rows = db.execute(
-                "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId FROM entries ORDER BY date, start"
+                "SELECT id, name, date, contact, notes, start, end, type, need_id AS needId, "
+                "reminder_opt_in AS reminderOptIn FROM entries ORDER BY date, start"
             ).fetchall()
         else:
             rows = db.execute(
@@ -250,6 +373,12 @@ def entries_api():
 
         try:
             day, start, end = validate_schedule(payload)
+            contact = phone_field(payload)
+            reminder_opt_in = payload.get("reminderOptIn", False)
+            if not isinstance(reminder_opt_in, bool):
+                raise ValueError("Reminder opt-in must be true or false.")
+            if reminder_opt_in and not contact:
+                raise ValueError("A phone number is required for a text reminder.")
             entry_type = payload.get("type", "general")
             if entry_type not in ("general", "childcare"):
                 raise ValueError("Invalid volunteer type.")
@@ -285,7 +414,8 @@ def entries_api():
                 "id": str(uuid4()),
                 "name": text_field(payload, "name", 120, required=True),
                 "date": day.isoformat(),
-                "contact": text_field(payload, "contact", 254, required=True),
+                "contact": contact,
+                "reminderOptIn": reminder_opt_in,
                 "notes": text_field(payload, "notes", 2000),
                 "start": start,
                 "end": end,
@@ -298,8 +428,9 @@ def entries_api():
 
         db.execute(
             """
-            INSERT INTO entries (id, name, date, contact, notes, start, end, type, need_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO entries
+            (id, name, date, contact, notes, start, end, type, need_id, reminder_opt_in)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 entry["id"],
@@ -311,10 +442,105 @@ def entries_api():
                 entry["end"],
                 entry["type"],
                 entry["needId"],
+                int(reminder_opt_in),
             ),
         )
+        sms_attempt_reserved = False
+        if twilio_sms_configured():
+            local_date = datetime.now(VOLUNTEER_TIMEZONE).date().isoformat()
+            attempts_today = db.execute(
+                "SELECT COUNT(*) FROM sms_notification_attempts WHERE local_date = ?",
+                (local_date,),
+            ).fetchone()[0]
+            if attempts_today < SMS_ALERTS_PER_DAY_LIMIT:
+                db.execute(
+                    """
+                    INSERT INTO sms_notification_attempts
+                    (signup_id, local_date, attempted_at, status)
+                    VALUES (?, ?, ?, 'sending')
+                    """,
+                    (entry["id"], local_date, time.time()),
+                )
+                sms_attempt_reserved = True
+            else:
+                app.logger.warning(
+                    "Daily signup SMS limit reached; alert skipped for signup %s.",
+                    entry["id"],
+                )
         db.commit()
+        if sms_attempt_reserved:
+            try:
+                send_signup_sms(entry)
+            except (HTTPError, URLError, RuntimeError, OSError):
+                app.logger.exception("Could not send signup SMS for entry %s.", entry["id"])
+                db.execute(
+                    "UPDATE sms_notification_attempts SET status = 'failed' WHERE signup_id = ?",
+                    (entry["id"],),
+                )
+                db.commit()
+            else:
+                db.execute(
+                    "UPDATE sms_notification_attempts SET status = 'sent' WHERE signup_id = ?",
+                    (entry["id"],),
+                )
+                db.commit()
         return jsonify({"ok": True, "entry": entry})
+
+
+@app.route("/api/internal/shift-reminders", methods=["POST"])
+@internal_job_required
+def send_shift_reminder():
+    now_local = datetime.now(VOLUNTEER_TIMEZONE)
+    if now_local.hour < 16:
+        return jsonify({"processed": False, "reason": "not_due"}), 200
+    tomorrow = (now_local.date() + timedelta(days=1)).isoformat()
+    db = get_db()
+    db.execute("BEGIN IMMEDIATE")
+    entry = db.execute(
+        """
+        SELECT id, contact, date, start, end, type FROM entries
+        WHERE date = ? AND reminder_opt_in = 1
+        AND NOT EXISTS (
+            SELECT 1 FROM shift_reminder_attempts WHERE signup_id = entries.id
+        )
+        ORDER BY start, id LIMIT 1
+        """,
+        (tomorrow,),
+    ).fetchone()
+    if not entry:
+        db.commit()
+        return jsonify({"processed": False, "reason": "complete"}), 200
+    if not twilio_sender_configured():
+        db.rollback()
+        app.logger.error("Twilio settings are missing for volunteer reminders.")
+        return jsonify({"error": "Twilio reminder settings are not configured."}), 503
+    # Claim before sending: retries after a timeout must not send duplicate texts.
+    db.execute(
+        "INSERT INTO shift_reminder_attempts VALUES (?, ?, 'sending')",
+        (entry["id"], time.time()),
+    )
+    db.commit()
+    start = datetime.strptime(entry["start"], "%H:%M").strftime("%I:%M %p").lstrip("0")
+    end = datetime.strptime(entry["end"], "%H:%M").strftime("%I:%M %p").lstrip("0")
+    shift_type = "child care" if entry["type"] == "childcare" else "housebuilding"
+    body = (
+        f"House Help reminder: your {shift_type} volunteer shift is tomorrow "
+        f"({entry['date']}), {start}-{end} Utah time. Reply STOP to opt out."
+    )
+    destination = "+1" + re.sub(r"[^0-9]", "", entry["contact"])
+    try:
+        send_twilio_sms(destination, body)
+    except (RuntimeError, OSError):
+        app.logger.exception("Could not send reminder for signup %s.", entry["id"])
+        status = "failed"
+    else:
+        status = "accepted"
+    db.execute(
+        "UPDATE shift_reminder_attempts SET status = ? WHERE signup_id = ?",
+        (status, entry["id"]),
+    )
+    db.commit()
+    return jsonify({"processed": True, "accepted": status == "accepted"}), 200
 
 
 @app.route("/api/entries/<entry_id>", methods=["DELETE"])
@@ -454,10 +680,12 @@ def admin_logout():
     return jsonify({"ok": True})
 
 
+@app.route("/privacy", defaults={"filename": "privacy.html"})
+@app.route("/terms", defaults={"filename": "terms.html"})
 @app.route("/<path:filename>")
 def serve_static(filename):
     public_files = {
-        "index.html", "project-info.html", "styles.css", "favicon.svg",
+        "index.html", "project-info.html", "privacy.html", "terms.html", "styles.css", "favicon.svg",
         "js/script.js", "js/state.js", "js/date-time.js", "js/data.js", "js/views.js",
     }
     if filename not in public_files:

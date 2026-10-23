@@ -225,16 +225,40 @@
             </label>
 
             <label>
-              Phone or email
+              Phone number (optional)
               <input
                 id="contact"
-                maxlength="254"
+                maxlength="30"
                 name="contact"
-                type="text"
-                placeholder="Phone or email"
-                required
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel-national"
+                placeholder="801-555-1234"
+                pattern="[2-9][0-9]{2}-[2-9][0-9]{2}-[0-9]{4}"
               />
             </label>
+          </div>
+
+          <div id="reminder-option" class="field-row reminder-card" hidden>
+            <label class="reminder-consent">
+              <input
+                id="reminder-opt-in"
+                name="reminder-opt-in"
+                type="checkbox"
+              />
+              <span>
+                <strong class="reminder-title">Text me a reminder the day before my shift.</strong>
+                <span class="reminder-description">By checking this
+                box, I agree to receive one automated text reminder at this
+                number. Message and data rates may apply. Reply STOP to opt out
+                or HELP for help. Consent to receive text messages is optional
+                and is not required to volunteer.</span>
+              </span>
+            </label>
+            <p class="reminder-policy-links">
+              Read our <a href="/privacy">Privacy Policy</a> and
+              <a href="/terms">Terms &amp; Conditions</a>.
+            </p>
           </div>
 
           <div class="field-row two-up">
@@ -256,13 +280,22 @@
           <div class="field-row">
             <label>
               Notes
-              <textarea id="notes" name="notes" rows="3" maxlength="2000"></textarea>
+              <textarea
+                id="notes"
+                name="notes"
+                rows="3"
+                maxlength="2000"
+              ></textarea>
             </label>
           </div>
 
           <button type="submit">Add volunteer slot</button>
         </form>
       </section>
+      <footer class="legal-links">
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms &amp; Conditions</a>
+      </footer>
     </div>
 
     <script type="module" src="js/script.js"></script>

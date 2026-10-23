@@ -15,3 +15,13 @@ services:
         value: "true"
       - key: DATABASE_PATH
         value: /var/data/volunteer_app.db
+      - key: REMINDER_JOB_TOKEN
+        generateValue: true
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: SMS_ALERT_PHONE
+        sync: false

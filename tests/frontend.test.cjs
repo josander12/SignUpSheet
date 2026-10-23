@@ -96,7 +96,7 @@ async function loadApp({ delayInitialLoad = false, initialFailure = false } = {}
 
 function fillSignup(app) {
   const values = {
-    name: "Test Volunteer", contact: "test@example.invalid", notes: "",
+    name: "Test Volunteer", contact: "801-555-1234", notes: "",
     date: "2099-01-05", "start-time": "11:45", "end-time": "12:45",
   };
   for (const [id, value] of Object.entries(values)) app.element(id).value = value;
@@ -143,6 +143,69 @@ for (const type of ["general", "childcare"]) {
     assert.equal(app.element("signup-page").classList.contains("hidden"), true);
   });
 }
+
+test("signup can be submitted without contact information", async () => {
+  const app = await loadApp();
+  fillSignup(app);
+  app.element("contact").value = "";
+  await app.element("signup-form").handlers.submit({ preventDefault() {} });
+  assert.equal(app.alerts.length, 0);
+  const request = app.requests.find((request) => request.method === "POST");
+  assert.equal(JSON.parse(request.body).contact, "");
+});
+
+test("phone formats automatically and reminder consent is optional and reset", async () => {
+  const app = await loadApp();
+  const phone = app.element("contact");
+  const option = app.element("reminder-option");
+  const checkbox = app.element("reminder-opt-in");
+  assert.equal(option.hidden, true);
+  assert.equal(checkbox.disabled, true);
+  phone.value = "(801) 555-1234";
+  phone.handlers.input();
+  assert.equal(phone.value, "801-555-1234");
+  assert.equal(option.hidden, false);
+  assert.equal(checkbox.checked, false);
+  checkbox.checked = true;
+  phone.value = "";
+  phone.handlers.input();
+  assert.equal(option.hidden, true);
+  assert.equal(checkbox.checked, false);
+  fillSignup(app);
+  phone.handlers.input();
+  checkbox.checked = true;
+  await app.element("signup-form").handlers.submit({ preventDefault() {} });
+  const request = app.requests.find((request) => request.method === "POST");
+  const entry = JSON.parse(request.body);
+  assert.equal(entry.contact, "801-555-1234");
+  assert.equal(entry.reminderOptIn, true);
+  assert.equal(option.hidden, true);
+  assert.equal(checkbox.checked, false);
+});
+
+test("phone accepts pasted country code but rejects email and incomplete numbers", async () => {
+  const app = await loadApp();
+  fillSignup(app);
+  const phone = app.element("contact");
+  phone.value = "+1 (801) 555-1234";
+  phone.handlers.input();
+  assert.equal(phone.value, "801-555-1234");
+  for (const value of ["person@example.invalid", "801-555", "123-456-7890"]) {
+    phone.value = value;
+    await app.element("signup-form").handlers.submit({ preventDefault() {} });
+    assert.equal(app.element("reminder-option").hidden, true);
+  }
+  assert.equal(app.alerts.length, 3);
+  assert.equal(app.requests.some((request) => request.method === "POST"), false);
+});
+
+test("valid phone without consent does not request a reminder", async () => {
+  const app = await loadApp();
+  fillSignup(app);
+  await app.element("signup-form").handlers.submit({ preventDefault() {} });
+  const request = app.requests.find((request) => request.method === "POST");
+  assert.equal(JSON.parse(request.body).reminderOptIn, false);
+});
 
 test("failed signup preserves form and cache and shows an error", async () => {
   const app = await loadApp();

@@ -37,6 +37,33 @@ import {
   renderSelectedDateDetail, renderCalendar, refreshViews, updateAdminView,
 } from "./views.js";
 
+const phoneInput = document.getElementById("contact");
+const reminderOption = document.getElementById("reminder-option");
+const reminderCheckbox = document.getElementById("reminder-opt-in");
+
+function updatePhoneField() {
+  const raw = phoneInput.value.trim();
+  if (/^\+?[0-9() .-]*$/.test(raw)) {
+    let digits = raw.replace(/[^0-9]/g, "");
+    if (digits.length === 11 && digits.startsWith("1")) digits = digits.slice(1);
+    if (digits.length <= 10) {
+      phoneInput.value = digits.length > 6
+        ? `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+        : digits.length > 3
+          ? `${digits.slice(0, 3)}-${digits.slice(3)}`
+          : digits;
+    }
+  }
+  const valid = /^[2-9][0-9]{2}-[2-9][0-9]{2}-[0-9]{4}$/.test(phoneInput.value);
+  reminderOption.hidden = !valid;
+  reminderCheckbox.disabled = !valid;
+  if (!valid) reminderCheckbox.checked = false;
+  return valid;
+}
+
+phoneInput.addEventListener("input", updatePhoneField);
+updatePhoneField();
+
 function populateTimeSelects(dateValue) {
   const window = getCurrentTimeWindow(dateValue);
 
@@ -304,7 +331,8 @@ form.addEventListener("submit", async (event) => {
 
   const name = document.getElementById("name").value.trim();
   const dateValue = dateInput.value;
-  const contact = document.getElementById("contact").value.trim();
+  const validPhone = updatePhoneField();
+  const contact = phoneInput.value.trim();
   const notes = document.getElementById("notes").value.trim();
   const start = startSelect.value;
   const end = endSelect.value;
@@ -314,8 +342,8 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (!contact) {
-    window.alert("Please provide a phone number or email.");
+  if (contact && !validPhone) {
+    window.alert("Please provide a valid 10-digit phone number, or leave it blank.");
     return;
   }
 
@@ -328,6 +356,7 @@ form.addEventListener("submit", async (event) => {
     name,
     date: dateValue,
     contact,
+    reminderOptIn: validPhone && reminderCheckbox.checked === true,
     notes,
     start,
     end,
@@ -376,6 +405,8 @@ form.addEventListener("submit", async (event) => {
   state.selectedNeedId = null;
   signupTypeSelect.value = "general";
   form.reset();
+  reminderCheckbox.checked = false;
+  updatePhoneField();
   dateInput.value = dateValue;
   refreshViews();
   showCalendarPage();

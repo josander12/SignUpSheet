@@ -49,7 +49,7 @@ export function renderAdminEntries() {
           <th>Name</th>
           <th>Date</th>
           <th>Time</th>
-          <th>Contact</th>
+          <th>Phone</th>
           <th>Notes</th>
           <th>Action</th>
         </tr>

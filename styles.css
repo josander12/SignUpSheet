@@ -299,11 +299,176 @@ h1 {
   gap: 0.85rem;
 }
 
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem 0;
+}
+
+.legal-links a {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-underline-offset: 0.25em;
+}
+
+.legal-page {
+  max-width: 860px;
+  padding-top: clamp(1.5rem, 5vw, 4rem);
+}
+
+.legal-header {
+  padding: 0 clamp(0.5rem, 3vw, 2rem) 1rem;
+}
+
+.legal-header h1 {
+  margin: 0.5rem 0 1rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-strong);
+}
+
+.legal-nav a {
+  flex: 1 1 12rem;
+  padding: 0.8rem 1rem;
+  border-radius: 11px;
+  color: var(--muted);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.legal-nav a[aria-current="page"] {
+  background: var(--panel);
+  color: var(--accent-dark);
+  box-shadow: 0 2px 6px rgba(73, 48, 34, 0.08);
+}
+
+.legal-nav a:hover {
+  color: var(--accent-dark);
+  background: var(--panel);
+}
+
+.legal-document {
+  padding: clamp(1.25rem, 5vw, 3rem);
+  line-height: 1.8;
+}
+
+.legal-document .legal-intro {
+  margin: 0 0 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.legal-document h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.legal-document section + section {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+}
+
+.legal-document ul {
+  padding-left: 1.3rem;
+}
+
+.legal-document li + li {
+  margin-top: 0.65rem;
+}
+
+.legal-document li::marker {
+  color: var(--accent);
+}
+
+.legal-document section.legal-sms {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  background: var(--panel-strong);
+}
+
+.legal-page a:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
 label {
   display: block;
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--muted);
+}
+
+.reminder-card {
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.reminder-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.reminder-title {
+  display: block;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.reminder-description {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.reminder-policy-links {
+  margin: 0.85rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.reminder-policy-links a {
+  color: var(--accent-dark);
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.reminder-policy-links a:hover {
+  color: var(--ink);
+}
+
+.reminder-policy-links a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 input,
@@ -327,6 +492,21 @@ textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(184, 102, 45, 0.1);
   outline: none;
+}
+
+.reminder-consent input[type="checkbox"] {
+  flex: 0 0 1.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  accent-color: var(--accent-dark);
+  cursor: pointer;
+}
+
+.reminder-consent input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 3px;
 }
 
 textarea {

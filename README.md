@@ -48,16 +48,18 @@ node --experimental-vm-modules --test tests/frontend.test.cjs
 Run the backend regression tests (using an isolated temporary database):
 
 ```bash
-python -m unittest discover -s tests -p test_app.py -v
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 ## Validation and security
 
 - The server assigns signup UUIDs and validates dates, times, volunteer type,
-  required name/contact, and child care need references. General shifts use
+  required name, optional phone number, and child care need references. General shifts use
   15-minute increments within Monday/Wednesday/Saturday windows. Child care
   shifts may use any minute within an existing need, matching the admin time
-  inputs. Names are limited to 120 characters, contact to 254, and notes to 2000.
+  inputs. Names are limited to 120 characters and notes to 2000. New signups
+  accept a 10-digit North American phone number (optionally prefixed with +1),
+  stored as `xxx-xxx-xxxx`. Existing phone/email records are preserved.
 - Child care signup intervals cannot overlap for the same need. Adjacent and
   non-overlapping partial shifts are accepted by the API; general housebuilding
   shifts remain unlimited. The current signup form still books the whole child
@@ -121,3 +123,70 @@ Its `plan: free` setting also does not match a disk-enabled service: before usin
 the Blueprint to create or synchronize a service, set the actual paid service
 plan and configure the persistent disk. A database path alone does not provision
 persistent storage.
+
+## Signup text alerts
+
+When Twilio is configured, each accepted signup triggers an SMS alert to the
+configured alert phone. Alerts include the volunteer's name, signup type, date,
+and time, but not contact information or notes. The app caps SMS attempts at
+10 per Mountain-time calendar day; signups still succeed if the cap is reached
+or Twilio is unavailable.
+
+Set these Render web service environment variables:
+
+- `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`: Twilio account credentials.
+- `TWILIO_FROM_NUMBER`: the Twilio number authorized to send SMS, in E.164
+  format (for example, `+18015551234`).
+- `SMS_ALERT_PHONE`: the destination phone number, also in E.164 format.
+
+Keep the Auth Token private and enter it only in Render's environment settings.
+Twilio trial accounts may send only to verified destination numbers and may
+append trial-account text to messages. Confirm the sender is SMS-enabled and
+complete any required U.S. messaging registration in Twilio before relying on
+delivery.
+
+## Optional volunteer reminder texts
+
+Public [Privacy Policy](privacy.html) and [Terms & Conditions](terms.html) pages
+are available at `/privacy` and `/terms`, with links on the signup page and
+alongside the reminder consent option.
+
+The optional phone field automatically formats numbers as `xxx-xxx-xxxx`.
+A valid number reveals an unchecked reminder-consent checkbox. Clearing or
+invalidating the number clears consent. The server requires explicit boolean
+`reminderOptIn: true` and a valid phone number; providing a phone alone never
+opts a volunteer in. Existing signups remain opted out after migration.
+
+At approximately 4 PM `America/Denver` time the day before a shift, the
+nightly GitHub Actions workflow sends opted-in volunteers a reminder at their
+signup phone number. Both general and child care shifts are included.
+Reminder attempts have **no daily cap**, separate from the 10-per-day alerts
+sent to the administrator. Enable Twilio's opt-out handling so STOP replies are
+honored. Trial accounts still require verified recipient numbers.
+
+Reminders use `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+`TWILIO_FROM_NUMBER`; they do not require `SMS_ALERT_PHONE`.
+The protected endpoint `/api/internal/shift-reminders` uses
+`REMINDER_JOB_TOKEN` and processes one signup per request;
+the workflow drains pending reminders without holding a long web request.
+Deleted signups are excluded. Later hourly checks pick up signups made after
+the initial nightly run, before midnight Mountain time. Same-day signups
+cannot receive a day-before reminder.
+
+The workflow is
+[.github/workflows/volunteer-reminders.yml](.github/workflows/volunteer-reminders.yml).
+Render generates `REMINDER_JOB_TOKEN` through the Blueprint. Copy that value
+into a GitHub Actions repository secret named `REMINDER_JOB_TOKEN`, and set the
+repository variable `SIGNUP_APP_URL` to the public HTTPS service URL.
+The UTC schedule accounts for daylight-saving changes; the app checks Utah
+local time before sending. A manual run before 4 PM safely skips reminders.
+Instant signup alerts do not require this scheduled workflow or its token.
+
+The app records each reminder attempt before contacting Twilio, preventing
+duplicate sends on repeated or concurrent runs. Network failures or interrupted
+requests are not automatically retried for that signup, because Twilio may
+already have accepted the message. Failures are logged and reported by the
+workflow; an accepted request does not guarantee delivery. Review Twilio's
+message logs for delivery failures. GitHub scheduling delays, account limits,
+and carrier filtering can affect delivery. Monitor Twilio spending, since
+public signups can request reminders without a daily cost cap.
