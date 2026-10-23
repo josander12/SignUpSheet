@@ -131,6 +131,55 @@ textarea {
   opacity: 0.9;
 }
 
+.secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+  transition:
+    transform 0.15s ease,
+    filter 0.15s ease;
+}
+
+.secondary-link:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.project-info-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  max-width: 100%;
+  min-height: 46px;
+  margin-top: 1rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--accent-dark);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--accent-dark);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.project-info-link:hover {
+  background: var(--accent-dark);
+  color: var(--panel);
+}
+
+.project-info-link:focus-visible {
+  outline: 3px solid var(--accent-dark);
+  outline-offset: 3px;
+}
+
 .eyebrow {
   margin: 0 0 0.25rem;
   color: var(--accent-dark);
@@ -190,6 +239,50 @@ h1 {
 
 .signup-header h2 {
   margin: 0;
+}
+
+.project-info {
+  background: var(--panel);
+  line-height: 1.65;
+}
+
+.project-info section + section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.project-info h2 {
+  margin-bottom: 0.65rem;
+  line-height: 1.3;
+}
+
+.project-info h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.project-info p,
+.project-tools {
+  max-width: 75ch;
+}
+
+.project-info section > :last-child {
+  margin-bottom: 0;
+}
+
+.project-info a:not(.secondary-link) {
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.project-tools {
+  padding-left: 1.5rem;
+  columns: 2 14rem;
+}
+
+.project-tools li {
+  break-inside: avoid;
 }
 
 .field-row {

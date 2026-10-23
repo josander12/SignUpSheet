@@ -11,5 +11,7 @@ services:
         generateValue: true
       - key: ADMIN_PASSWORD
         sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
       - key: DATABASE_PATH
-        value: /tmp/volunteer_app.db
+        value: /var/data/volunteer_app.db

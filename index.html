@@ -34,6 +34,7 @@
             class="secondary admin-trigger"
             type="button"
             aria-label="Admin sign in"
+            disabled
           >
             Admin sign in
           </button>
@@ -47,9 +48,14 @@
             Help support the Jimenez family in building their home
           </p>
           <h1>Volunteer Sign-Up Sheet</h1>
+          <a class="project-info-link" href="project-info.html">
+            Project info &amp; directions
+            <span aria-hidden="true">&rarr;</span>
+          </a>
         </div>
       </header>
 
+      <p id="app-loading" role="status">Loading sign-up information...</p>
       <div id="server-load-error" class="load-error" role="alert" hidden>
         <p>We couldn't load the latest sign-up information.</p>
         <button id="retry-server-load" class="secondary" type="button">
@@ -78,7 +84,7 @@
         </div>
       </section>
 
-      <div id="calendar-page">
+      <div id="calendar-page" inert>
         <main class="layout">
           <aside class="panel schedule-panel">
             <h2>Volunteer windows</h2>
@@ -176,6 +182,7 @@
 
       <section
         id="signup-page"
+        inert
         class="panel signup-page hidden"
         aria-live="polite"
       >
@@ -192,6 +199,7 @@
               Name
               <input
                 id="name"
+                maxlength="120"
                 name="name"
                 type="text"
                 placeholder="Your name"
@@ -220,6 +228,7 @@
               Phone or email
               <input
                 id="contact"
+                maxlength="254"
                 name="contact"
                 type="text"
                 placeholder="Phone or email"
@@ -247,7 +256,7 @@
           <div class="field-row">
             <label>
               Notes
-              <textarea id="notes" name="notes" rows="3"></textarea>
+              <textarea id="notes" name="notes" rows="3" maxlength="2000"></textarea>
             </label>
           </div>
 
@@ -256,6 +265,6 @@
       </section>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module" src="js/script.js"></script>
   </body>
 </html>
