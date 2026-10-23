@@ -157,7 +157,14 @@ def internal_job_required(view):
 
 
 def twilio_sms_configured():
-    return twilio_sender_configured() and bool(os.environ.get("SMS_ALERT_PHONE"))
+    return sms_enabled() and twilio_sender_configured() and bool(os.environ.get("SMS_ALERT_PHONE"))
+
+
+def sms_enabled():
+    value = os.environ.get("SMS_ENABLED", "false").strip().lower()
+    if value not in ("true", "false"):
+        raise RuntimeError("SMS_ENABLED must be true or false.")
+    return value == "true"
 
 
 def twilio_sender_configured():
@@ -490,6 +497,8 @@ def entries_api():
 @app.route("/api/internal/shift-reminders", methods=["POST"])
 @internal_job_required
 def send_shift_reminder():
+    if not sms_enabled():
+        return jsonify({"processed": False, "reason": "sms_disabled"}), 200
     now_local = datetime.now(VOLUNTEER_TIMEZONE)
     if now_local.hour < 16:
         return jsonify({"processed": False, "reason": "not_due"}), 200

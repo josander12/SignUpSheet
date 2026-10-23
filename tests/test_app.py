@@ -30,6 +30,7 @@ class ApiTests(unittest.TestCase):
             "TWILIO_AUTH_TOKEN": "",
             "TWILIO_FROM_NUMBER": "",
             "SMS_ALERT_PHONE": "",
+            "SMS_ENABLED": "true",
         }
         cls.test_environment = environment
         with patch.dict(os.environ, environment):
@@ -339,6 +340,30 @@ class ApiTests(unittest.TestCase):
                 db.execute("SELECT status FROM sms_notification_attempts").fetchall(),
                 [("failed",)],
             )
+
+    def test_disabled_sms_preserves_signups_without_consuming_attempts(self):
+        self.add_reminder_entry("pending-disabled")
+        with patch.dict(os.environ, {"SMS_ENABLED": "false"}), patch.object(
+            self.module, "send_signup_sms"
+        ) as alert, patch.object(self.module, "send_twilio_sms") as reminder:
+            response = self.client.post("/api/entries", json=self.entry)
+            self.assertEqual(response.status_code, 200)
+            response = self.client.post(
+                "/api/internal/shift-reminders", headers=self.reminder_headers
+            )
+            self.assertEqual(response.json, {"processed": False, "reason": "sms_disabled"})
+            alert.assert_not_called()
+            reminder.assert_not_called()
+        with closing(sqlite3.connect(self.database)) as db:
+            for table in ("sms_notification_attempts", "shift_reminder_attempts"):
+                self.assertEqual(db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0)
+
+    def test_sms_is_disabled_by_default(self):
+        with patch.dict(os.environ, clear=True):
+            self.assertFalse(self.module.sms_enabled())
+        with patch.dict(os.environ, {"SMS_ENABLED": "typo"}):
+            with self.assertRaisesRegex(RuntimeError, "SMS_ENABLED"):
+                self.module.sms_enabled()
 
     def test_signup_alert_targets_configured_number_not_volunteer_phone(self):
         environment = {

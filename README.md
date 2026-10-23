@@ -134,6 +134,10 @@ or Twilio is unavailable.
 
 Set these Render web service environment variables:
 
+- `SMS_ENABLED`: leave `false` while A2P registration is pending; set `true`
+  after approval to enable both signup alerts and volunteer reminders. Missing
+  settings default to disabled. Disabled SMS does not consume attempts and
+  does not replay old administrator alerts when enabled.
 - `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`: Twilio account credentials.
 - `TWILIO_FROM_NUMBER`: the Twilio number authorized to send SMS, in E.164
   format (for example, `+18015551234`).
@@ -144,6 +148,16 @@ Twilio trial accounts may send only to verified destination numbers and may
 append trial-account text to messages. Confirm the sender is SMS-enabled and
 complete any required U.S. messaging registration in Twilio before relying on
 delivery.
+
+For local setup, copy the variable names from `.env.example` into your ignored
+`.env` file and enter credentials there. Use `SMS_ENABLED=false` while preparing
+the account. On Render, enter the same Twilio settings separately, keep
+`SESSION_COOKIE_SECURE=true`, and retain the existing persistent database disk.
+For this deployment, set the GitHub Actions variable `SIGNUP_APP_URL` to
+`https://jimenezhomebuild.com`. Ensure the purchased SMS number is associated
+with the approved campaign's Messaging Service, and configure STOP/HELP handling
+in Twilio. No inbound webhook is needed by this app if Twilio handles those
+keywords. Verify `/privacy` and `/terms` are publicly accessible after deployment.
 
 ## Optional volunteer reminder texts
 
