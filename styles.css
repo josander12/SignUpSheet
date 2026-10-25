@@ -557,6 +557,15 @@ button[type="submit"] {
   line-height: 1.5;
 }
 
+.hours-requirement {
+  margin: 1rem 0;
+  padding: 0.8rem 0.9rem;
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  line-height: 1.5;
+}
+
 .admin-panel {
   margin-bottom: 1.5rem;
 }

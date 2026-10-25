@@ -8,7 +8,9 @@ A simple sign-up sheet for volunteers helping with a house build project.
 - Wednesday: 11:45 AM – 5:45 PM
 - Saturday: 8:30 AM – 2:00 PM
 
-Volunteers can choose any start and end time within those hours.
+Volunteers can choose any start and end time within those hours. Each visit
+must be at least 3 hours on site to count toward Emily's required hours;
+shorter shifts are welcome but will not count toward that requirement.
 
 ## Run locally
 
