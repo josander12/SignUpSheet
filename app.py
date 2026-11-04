@@ -691,10 +691,12 @@ def admin_logout():
 
 @app.route("/privacy", defaults={"filename": "privacy.html"})
 @app.route("/terms", defaults={"filename": "terms.html"})
+@app.route("/sms-consent", defaults={"filename": "sms-consent.html"})
 @app.route("/<path:filename>")
 def serve_static(filename):
     public_files = {
         "index.html", "project-info.html", "privacy.html", "terms.html", "styles.css", "favicon.svg",
+        "sms-consent.html", "assets/Screenshot 2026-11-03 203341.png",
         "js/script.js", "js/state.js", "js/date-time.js", "js/data.js", "js/views.js",
     }
     if filename not in public_files:

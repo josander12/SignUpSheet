@@ -625,7 +625,8 @@ class ApiTests(unittest.TestCase):
             self.login()
 
     def test_security_headers_on_pages_assets_api_and_errors(self):
-        for url in ("/", "/project-info.html", "/privacy", "/terms", "/js/script.js", "/styles.css",
+        for url in ("/", "/project-info.html", "/privacy", "/terms", "/sms-consent",
+                    "/assets/Screenshot%202026-11-03%20203341.png", "/js/script.js", "/styles.css",
                     "/api/health", "/missing-asset"):
             with self.client.get(url) as response:
                 policy = response.headers["Content-Security-Policy"]
@@ -668,6 +669,33 @@ class ApiTests(unittest.TestCase):
             signup = response.get_data(as_text=True)
         self.assertIn('href="/privacy"', signup)
         self.assertIn('href="/terms"', signup)
+        self.assertIn('href="/sms-consent"', signup)
+
+    def test_sms_consent_page_and_example_are_public(self):
+        image_url = "/assets/Screenshot%202026-11-03%20203341.png"
+        with self.client.get("/sms-consent") as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, "text/html")
+            html = response.get_data(as_text=True)
+        for content in (
+            "<h1>SMS Reminder Consent</h1>", "<strong>Joseph Anderson</strong>",
+            "one automated text reminder", "not required to volunteer",
+            "Message and data rates may apply", "Reply STOP", "HELP",
+            "unchecked by default", 'href="/privacy"', 'href="/terms"',
+            f'src="{image_url}"', 'href="/project-info.html#questions"',
+        ):
+            self.assertIn(content, html)
+        with self.client.get(image_url) as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, "image/png")
+            screenshot = Path(self.module.ROOT_DIR) / "assets" / "Screenshot 2026-11-03 203341.png"
+            self.assertEqual(response.get_data(), screenshot.read_bytes())
+        for url in ("/assets/other.png", "/assets/../app.py", "/volunteer_app.db"):
+            with self.subTest(url=url), self.client.get(url) as response:
+                self.assertEqual(response.status_code, 404)
+        for url in ("/privacy", "/terms"):
+            with self.subTest(url=url), self.client.get(url) as response:
+                self.assertIn('href="/sms-consent"', response.get_data(as_text=True))
 
     def test_login_throttling_persists_and_expires(self):
         now = time.time()

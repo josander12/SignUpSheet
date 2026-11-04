@@ -167,6 +167,12 @@ Public [Privacy Policy](privacy.html) and [Terms & Conditions](terms.html) pages
 are available at `/privacy` and `/terms`, with links on the signup page and
 alongside the reminder consent option.
 
+The public [SMS Reminder Consent](sms-consent.html) page at `/sms-consent`
+explains the reminder program and opt-in steps, displays the example signup
+screenshot, and links to both policies. It is linked from the signup footer
+and policy navigation. Only the specific example screenshot in `assets/` is
+publicly served; other files in that folder remain private.
+
 The optional phone field automatically formats numbers as `xxx-xxx-xxxx`.
 A valid number reveals an unchecked reminder-consent checkbox. Clearing or
 invalidating the number clears consent. The server requires explicit boolean
