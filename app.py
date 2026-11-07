@@ -178,11 +178,28 @@ def twilio_sender_configured():
     )
 
 
+def format_sms_date(date_value):
+    day = date.fromisoformat(date_value)
+    return f"{day.strftime('%A, %B')} {day.day}, {day.year}"
+
+
+def format_sms_time(time_value):
+    return datetime.strptime(time_value, "%H:%M").strftime("%I:%M %p").lstrip("0")
+
+
+def format_sms_schedule(date_value, start_value, end_value):
+    return (
+        f"{format_sms_date(date_value)}, "
+        f"{format_sms_time(start_value)}-{format_sms_time(end_value)} Mountain Time"
+    )
+
+
 def send_signup_sms(entry):
+    schedule = format_sms_schedule(entry["date"], entry["start"], entry["end"])
     message_body = (
-        f"New signup: {entry['name'][:50]} - "
-        f"{'Child care' if entry['type'] == 'childcare' else 'General'}, "
-        f"{entry['date']} {entry['start']}-{entry['end']}."
+        f"Joseph Anderson for JimenezHomeBuild: New volunteer signup! {entry['name'][:50]} signed up for "
+        f"{'Child care' if entry['type'] == 'childcare' else 'General'} assistance on"
+        f"{schedule}."
     )
     send_twilio_sms(os.environ["SMS_ALERT_PHONE"], message_body)
 
@@ -529,12 +546,14 @@ def send_shift_reminder():
         (entry["id"], time.time()),
     )
     db.commit()
-    start = datetime.strptime(entry["start"], "%H:%M").strftime("%I:%M %p").lstrip("0")
-    end = datetime.strptime(entry["end"], "%H:%M").strftime("%I:%M %p").lstrip("0")
+    shift_date = format_sms_date(entry["date"])
+    start = format_sms_time(entry["start"])
+    end = format_sms_time(entry["end"])
     shift_type = "child care" if entry["type"] == "childcare" else "housebuilding"
     body = (
-        f"House Help reminder: your {shift_type} volunteer shift is tomorrow "
-        f"({entry['date']}), {start}-{end} Utah time. Reply STOP to opt out."
+        "Joseph Anderson for JimenezHomeBuild: Reminder! You're scheduled to "
+        f"volunteer for {shift_type} tomorrow, {shift_date}, from {start} to {end} Mountain Time. "
+        "Thank you for helping! Reply STOP to opt out or HELP for help."
     )
     destination = "+1" + re.sub(r"[^0-9]", "", entry["contact"])
     try:
@@ -691,12 +710,10 @@ def admin_logout():
 
 @app.route("/privacy", defaults={"filename": "privacy.html"})
 @app.route("/terms", defaults={"filename": "terms.html"})
-@app.route("/sms-consent", defaults={"filename": "sms-consent.html"})
 @app.route("/<path:filename>")
 def serve_static(filename):
     public_files = {
         "index.html", "project-info.html", "privacy.html", "terms.html", "styles.css", "favicon.svg",
-        "sms-consent.html", "assets/Screenshot 2026-11-03 203341.png",
         "js/script.js", "js/state.js", "js/date-time.js", "js/data.js", "js/views.js",
     }
     if filename not in public_files:

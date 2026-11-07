@@ -207,6 +207,88 @@ test("valid phone without consent does not request a reminder", async () => {
   assert.equal(JSON.parse(request.body).reminderOptIn, false);
 });
 
+for (const type of ["general", "childcare"]) {
+  test(`admin can add a ${type} volunteer from day details`, async () => {
+    const app = await loadApp();
+    const date = type === "general" ? "2099-01-05" : "2099-01-06";
+    app.state.adminAuthenticated = true;
+    app.views.updateAdminView();
+    app.state.childCareNeedsCache = [{
+      id: "need-1", date, start: "09:00", end: "10:00", notes: "Help",
+    }];
+    app.element("calendar-grid").handlers.click({
+      target: { closest: () => ({ dataset: { date } }) },
+    });
+    const details = app.element("date-detail").innerHTML;
+    assert.match(details, /Add child care volunteer/);
+    if (type === "general") assert.match(details, /Add housebuilding volunteer/);
+    else assert.doesNotMatch(details, /Add housebuilding volunteer/);
+
+    const selector = type === "general" ? ".volunteer-day-button" : ".childcare-volunteer-button";
+    await app.element("date-detail").handlers.click({
+      target: { closest: (candidate) => candidate === selector
+        ? { dataset: { date, needId: "need-1" } } : null },
+    });
+    assert.equal(app.element("day-details-dialog").open, false);
+    assert.equal(app.element("signup-page").classList.contains("hidden"), false);
+    assert.equal(app.element("admin-content").classList.contains("hidden"), true);
+    assert.equal(app.element("date").value, date);
+    assert.equal(app.state.signupType, type);
+    assert.equal(app.state.selectedNeedId, type === "childcare" ? "need-1" : null);
+
+    fillSignup(app);
+    app.element("date").value = date;
+    app.element("contact").handlers.input();
+    assert.equal(app.element("admin-reminder-notice").hidden, false);
+    assert.equal(app.element("reminder-option").hidden, true);
+    assert.equal(app.element("reminder-opt-in").disabled, true);
+    app.element("reminder-opt-in").checked = true;
+    await app.element("signup-form").handlers.submit({ preventDefault() {} });
+    const request = app.requests.find((item) => item.url === "/api/entries" && item.method === "POST");
+    const entry = JSON.parse(request.body);
+    assert.equal(entry.type, type);
+    assert.equal(entry.date, date);
+    assert.equal(entry.reminderOptIn, false);
+    if (type === "childcare") assert.equal(entry.needId, "need-1");
+    assert.equal(app.state.entriesCache.length, 1);
+    assert.equal(app.element("admin-content").classList.contains("hidden"), false);
+    assert.equal(app.element("signup-page").classList.contains("hidden"), true);
+    assert.match(app.element("admin-entries").innerHTML, /Test Volunteer/);
+  });
+}
+
+test("admin can return to calendar without submitting a volunteer", async () => {
+  const app = await loadApp();
+  app.state.adminAuthenticated = true;
+  app.views.updateAdminView();
+  app.element("calendar-grid").handlers.click({
+    target: { closest: () => ({ dataset: { date: "2099-01-05" } }) },
+  });
+  await app.element("date-detail").handlers.click({
+    target: { closest: (selector) => selector === ".volunteer-day-button"
+      ? { dataset: { date: "2099-01-05" } } : null },
+  });
+  app.element("back-to-calendar").handlers.click();
+  assert.equal(app.element("signup-page").classList.contains("hidden"), true);
+  assert.equal(app.element("admin-content").classList.contains("hidden"), false);
+  assert.equal(app.requests.some((request) => request.method === "POST"), false);
+});
+
+test("filled child care needs do not offer admin signup", async () => {
+  const app = await loadApp();
+  app.state.adminAuthenticated = true;
+  app.state.selectedDate = "2099-01-06";
+  app.state.childCareNeedsCache = [{
+    id: "need-1", date: "2099-01-06", start: "09:00", end: "10:00",
+  }];
+  app.state.entriesCache = [{
+    id: "entry-1", type: "childcare", needId: "need-1",
+    date: "2099-01-06", start: "09:00", end: "10:00",
+  }];
+  app.views.renderSelectedDateDetail();
+  assert.doesNotMatch(app.element("date-detail").innerHTML, /Add child care volunteer/);
+});
+
 test("failed signup preserves form and cache and shows an error", async () => {
   const app = await loadApp();
   fillSignup(app);
@@ -356,6 +438,39 @@ test("logout reloads public state and restores volunteer windows", async () => {
   assert.equal(app.state.entriesCache.length, 0);
   assert.equal(app.element(".schedule-panel").classList.contains("hidden"), false);
   assert.equal(app.element("admin-content").classList.contains("hidden"), true);
+});
+
+test("admin volunteer details show requested reminder status without exposing it in public day details", async () => {
+  const app = await loadApp();
+  app.state.entriesCache = [
+    { id: "yes-boolean", name: "Boolean yes", reminderOptIn: true },
+    { id: "yes-number", name: "Numeric yes", reminderOptIn: 1 },
+    { id: "no-boolean", name: "Boolean no", reminderOptIn: false },
+    { id: "no-number", name: "Numeric no", reminderOptIn: 0 },
+    { id: "unknown", name: "Unknown", reminderOptIn: undefined },
+  ].map((entry) => ({
+    date: "2099-01-05", start: "11:45", end: "12:45", ...entry,
+  }));
+  app.state.selectedDate = "2099-01-05";
+  app.state.adminAuthenticated = true;
+  app.views.refreshViews();
+
+  const table = app.element("admin-entries").innerHTML;
+  assert.match(table, /<th>Text reminders requested<\/th>/);
+  for (const [name, status] of [
+    ["Boolean yes", "Yes"], ["Numeric yes", "Yes"],
+    ["Boolean no", "No"], ["Numeric no", "No"], ["Unknown", "Unknown"],
+  ]) {
+    assert.match(table, new RegExp(`<td>${name}</td>(?:(?!</tr>)[\\s\\S])*?<td>${status}</td>`));
+  }
+  const details = app.element("date-detail").innerHTML;
+  assert.equal((details.match(/Text reminders requested: Yes/g) || []).length, 2);
+  assert.equal((details.match(/Text reminders requested: No/g) || []).length, 2);
+  assert.equal((details.match(/Text reminders requested: Unknown/g) || []).length, 1);
+
+  app.state.adminAuthenticated = false;
+  app.views.renderSelectedDateDetail();
+  assert.doesNotMatch(app.element("date-detail").innerHTML, /Text reminders requested/);
 });
 
 test("stored HTML is escaped in admin tables, day details, and public care notes", async () => {

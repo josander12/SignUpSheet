@@ -410,24 +410,6 @@ h1 {
   outline-offset: 4px;
 }
 
-.sms-consent-example {
-  margin: 1.5rem 0 0;
-}
-
-.sms-consent-example img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-}
-
-.sms-consent-example figcaption {
-  margin-top: 0.75rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
 label {
   display: block;
   font-size: 0.95rem;

@@ -133,6 +133,8 @@ configured alert phone. Alerts include the volunteer's name, signup type, date,
 and time, but not contact information or notes. The app caps SMS attempts at
 10 per Mountain-time calendar day; signups still succeed if the cap is reached
 or Twilio is unavailable.
+Both signup alerts and volunteer reminders display dates in a readable format
+and shift times in 12-hour Mountain Time.
 
 Set these Render web service environment variables:
 
@@ -167,17 +169,16 @@ Public [Privacy Policy](privacy.html) and [Terms & Conditions](terms.html) pages
 are available at `/privacy` and `/terms`, with links on the signup page and
 alongside the reminder consent option.
 
-The public [SMS Reminder Consent](sms-consent.html) page at `/sms-consent`
-explains the reminder program and opt-in steps, displays the example signup
-screenshot, and links to both policies. It is linked from the signup footer
-and policy navigation. Only the specific example screenshot in `assets/` is
-publicly served; other files in that folder remain private.
-
 The optional phone field automatically formats numbers as `xxx-xxx-xxxx`.
 A valid number reveals an unchecked reminder-consent checkbox. Clearing or
 invalidating the number clears consent. The server requires explicit boolean
 `reminderOptIn: true` and a valid phone number; providing a phone alone never
 opts a volunteer in. Existing signups remain opted out after migration.
+The admin volunteer details table and day details show whether reminders were
+requested for each signup; this is a consent status, not a delivery status.
+Admins can add volunteers from a calendar day's details, including for an
+available child care need. Admin-added signups do not request SMS reminders;
+volunteers must sign themselves up to opt in.
 
 At approximately 4 PM `America/Denver` time the day before a shift, the
 nightly GitHub Actions workflow sends opted-in volunteers a reminder at their

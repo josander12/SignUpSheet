@@ -40,6 +40,7 @@ import {
 const phoneInput = document.getElementById("contact");
 const reminderOption = document.getElementById("reminder-option");
 const reminderCheckbox = document.getElementById("reminder-opt-in");
+const adminReminderNotice = document.getElementById("admin-reminder-notice");
 
 function updatePhoneField() {
   const raw = phoneInput.value.trim();
@@ -55,9 +56,11 @@ function updatePhoneField() {
     }
   }
   const valid = /^[2-9][0-9]{2}-[2-9][0-9]{2}-[0-9]{4}$/.test(phoneInput.value);
-  reminderOption.hidden = !valid;
-  reminderCheckbox.disabled = !valid;
-  if (!valid) reminderCheckbox.checked = false;
+  const canOptIn = valid && !state.adminAuthenticated;
+  adminReminderNotice.hidden = !state.adminAuthenticated;
+  reminderOption.hidden = !canOptIn;
+  reminderCheckbox.disabled = !canOptIn;
+  if (!canOptIn) reminderCheckbox.checked = false;
   return valid;
 }
 
@@ -247,12 +250,15 @@ function validateRange(startTime, endTime, dateValue) {
 function showCalendarPage() {
   calendarPage.classList.remove("hidden");
   signupPage.classList.add("hidden");
+  if (state.adminAuthenticated) adminContent.classList.remove("hidden");
 }
 
 function showSignupPage() {
   dayDetailsDialog.close();
   calendarPage.classList.add("hidden");
+  adminContent.classList.add("hidden");
   signupPage.classList.remove("hidden");
+  updatePhoneField();
   signupPage.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -271,20 +277,18 @@ function setSelectedDate(dateValue, { openForm = true } = {}) {
   state.selectedDate = dateValue;
   dateInput.value = dateValue;
 
-  if (!state.adminAuthenticated) {
-    const needs = getChildCareNeedsForDate(dateValue);
-    if (!needs.length) {
-      state.signupType = "general";
-      state.selectedNeedId = null;
-    } else if (state.signupType === "childcare" && !state.selectedNeedId) {
-      state.selectedNeedId = needs[0].id;
-    }
-
-    updateSignupTypeOptions(dateValue);
-    populateTimeSelects(dateValue);
+  const needs = getChildCareNeedsForDate(dateValue);
+  if (!needs.length) {
+    state.signupType = "general";
+    state.selectedNeedId = null;
+  } else if (state.signupType === "childcare" && !state.selectedNeedId) {
+    state.selectedNeedId = needs[0].id;
   }
 
-  if (openForm && !state.adminAuthenticated) {
+  updateSignupTypeOptions(dateValue);
+  populateTimeSelects(dateValue);
+
+  if (openForm) {
     showSignupPage();
   }
 
@@ -356,7 +360,7 @@ form.addEventListener("submit", async (event) => {
     name,
     date: dateValue,
     contact,
-    reminderOptIn: validPhone && reminderCheckbox.checked === true,
+    reminderOptIn: !state.adminAuthenticated && validPhone && reminderCheckbox.checked === true,
     notes,
     start,
     end,
@@ -436,6 +440,7 @@ logoutAdminButton.addEventListener("click", async () => {
   }
 
   state.adminAuthenticated = false;
+  updatePhoneField();
   adminPanel.classList.remove("hidden");
   showAdminButton.classList.add("hidden");
   logoutAdminButton.classList.add("hidden");
@@ -470,6 +475,7 @@ document.getElementById("admin-login").addEventListener("click", async () => {
     }
 
     state.adminAuthenticated = true;
+    updatePhoneField();
     try {
       await refreshServerData();
       serverLoadError.hidden = true;
@@ -477,6 +483,9 @@ document.getElementById("admin-login").addEventListener("click", async () => {
       serverLoadError.hidden = false;
     }
     updateAdminView();
+    if (!signupPage.classList.contains("hidden")) {
+      adminContent.classList.add("hidden");
+    }
   } catch (error) {
     window.alert("Unable to reach the admin server. Please try again.");
   }
@@ -664,6 +673,7 @@ async function initializeApp() {
     });
     state.csrfToken = result.csrfToken;
     state.adminAuthenticated = result.isAdmin === true;
+    updatePhoneField();
     await refreshServerData();
     serverLoadError.hidden = true;
     initCalendarSelection();

@@ -19,6 +19,12 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function reminderConsentLabel(value) {
+  if (value === true || value === 1) return "Yes";
+  if (value === false || value === 0) return "No";
+  return "Unknown";
+}
+
 export function refreshViews() {
   renderCalendar();
   renderSelectedDateDetail();
@@ -50,6 +56,7 @@ export function renderAdminEntries() {
           <th>Date</th>
           <th>Time</th>
           <th>Phone</th>
+          <th>Text reminders requested</th>
           <th>Notes</th>
           <th>Action</th>
         </tr>
@@ -63,6 +70,7 @@ export function renderAdminEntries() {
                 <td>${formatDate(entry.date)}</td>
                 <td>${formatTime(entry.start)} – ${formatTime(entry.end)}</td>
                 <td>${escapeHtml(entry.contact || "Not provided")}</td>
+                <td>${reminderConsentLabel(entry.reminderOptIn)}</td>
                 <td>${escapeHtml(entry.notes || "—")}</td>
                 <td>
                   <button
@@ -141,6 +149,7 @@ export function renderSelectedDateDetail() {
                       <strong>${escapeHtml(entry.name)}</strong>
                       <div>${formatTime(entry.start)} – ${formatTime(entry.end)}</div>
                       <div>${escapeHtml(entry.contact || "No contact provided")}</div>
+                      <div>Text reminders requested: ${reminderConsentLabel(entry.reminderOptIn)}</div>
                       ${entry.notes ? `<div>${escapeHtml(entry.notes)}</div>` : ""}
                     </div>
                     <button
@@ -190,9 +199,40 @@ export function renderSelectedDateDetail() {
       );
     }
 
+    const window = getAllowedWindow(targetDate);
+    const activeChildcareNeeds = childcareNeeds.filter(
+      (need) => !isChildCareNeedFilled(need),
+    );
+    const signupOptions = [
+      ...(window ? [`
+        <button type="button" class="secondary volunteer-day-button"
+          data-date="${escapeHtml(targetDate)}">
+          Add housebuilding volunteer
+        </button>
+      `] : []),
+      ...activeChildcareNeeds.map((need) => `
+        <div class="care-need-row">
+          <div>
+            <strong>${formatTime(need.start)} – ${formatTime(need.end)}</strong>
+            ${need.notes ? `<div>${escapeHtml(need.notes)}</div>` : ""}
+          </div>
+          <button type="button" class="secondary childcare-volunteer-button"
+            data-date="${escapeHtml(targetDate)}" data-need-id="${escapeHtml(need.id)}">
+            Add child care volunteer
+          </button>
+        </div>
+      `),
+    ];
+
     dateDetail.innerHTML = `
       <h3>${formatDate(targetDate)}</h3>
       ${details.join("")}
+      ${signupOptions.length ? `
+        <section class="care-detail-block">
+          <h4>Add a volunteer</h4>
+          ${signupOptions.join("")}
+        </section>
+      ` : ""}
       <section class="care-detail-block admin-day-care">
         <h4>Child care needs</h4>
         ${

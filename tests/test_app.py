@@ -101,6 +101,17 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json["entry"]["contact"], "")
 
+    def test_admin_can_create_volunteer_signup(self):
+        self.login()
+        response = self.client.post(
+            "/api/entries", json={**self.entry, "reminderOptIn": False}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(response.json["entry"]["reminderOptIn"], False)
+        entries = self.client.get("/api/entries").json
+        self.assertEqual(entries[0]["name"], self.entry["name"])
+        self.assertEqual(entries[0]["reminderOptIn"], 0)
+
     def test_phone_validation_and_explicit_reminder_consent(self):
         for phone in ("8015551234", "(801) 555-1234", "+1 801-555-1234"):
             with self.subTest(phone=phone):
@@ -128,6 +139,9 @@ class ApiTests(unittest.TestCase):
         self.assertIs(response.json["entry"]["reminderOptIn"], False)
         public = self.client.get("/api/entries").json
         self.assertTrue(all("reminderOptIn" not in row for row in public))
+        self.login()
+        admin_entries = self.client.get("/api/entries").json
+        self.assertEqual(sorted(row["reminderOptIn"] for row in admin_entries), [0, 1, 1, 1])
 
     def add_reminder_entry(self, entry_id, day="2099-01-05", opted_in=True):
         with closing(sqlite3.connect(self.database)) as db, db:
@@ -171,9 +185,13 @@ class ApiTests(unittest.TestCase):
         send.assert_called_once()
         destination, body = send.call_args.args
         self.assertEqual(destination, "+18015551234")
-        self.assertIn("2099-01-05", body)
-        self.assertIn("11:45 AM-12:45 PM Utah time", body)
-        self.assertIn("STOP", body)
+        self.assertEqual(
+            body,
+            "Joseph Anderson for JimenezHomeBuild: Reminder! You're scheduled to "
+            "volunteer for housebuilding tomorrow, Monday, January 5, 2099, from 11:45 AM to "
+            "12:45 PM Mountain Time. Thank you for helping! Reply STOP to opt out "
+            "or HELP for help.",
+        )
 
     def test_reminder_failures_do_not_retry_or_lose_other_volunteers(self):
         self.add_reminder_entry("a-failed")
@@ -272,8 +290,13 @@ class ApiTests(unittest.TestCase):
             self.module, "send_twilio_sms"
         ) as send:
             self.assertTrue(self.request_reminder_at(after).json["accepted"])
-        self.assertIn("child care", send.call_args.args[1])
-        self.assertIn("9:10 AM-10:10 AM", send.call_args.args[1])
+        self.assertEqual(
+            send.call_args.args[1],
+            "Joseph Anderson for JimenezHomeBuild: Reminder! You're scheduled to "
+            "volunteer for child care tomorrow, Monday, January 5, 2099, from 9:10 AM to "
+            "10:10 AM Mountain Time. Thank you for helping! Reply STOP to opt out "
+            "or HELP for help.",
+        )
 
     def test_migration_keeps_existing_contacts_and_defaults_to_no_consent(self):
         with tempfile.TemporaryDirectory(prefix="reminder-migration-") as directory:
@@ -380,9 +403,24 @@ class ApiTests(unittest.TestCase):
         data = parse_qs(opener.call_args.args[0].data.decode())
         self.assertEqual(data["To"], ["+18015550101"])
         self.assertEqual(data["From"], ["+18015550100"])
-        self.assertIn(self.entry["name"], data["Body"][0])
-        self.assertIn(self.entry["date"], data["Body"][0])
+        self.assertEqual(
+            data["Body"][0],
+            "Jimenez Home Build new volunteer: Test Volunteer - General, "
+            "Monday, January 5, 2099, 11:45 AM-12:45 PM Mountain Time.",
+        )
         self.assertNotIn(self.entry["contact"], data["Body"][0])
+
+    def test_sms_schedule_format_handles_seasons_and_noon_midnight(self):
+        for date_value, start, end, expected in (
+            ("2099-01-05", "00:00", "12:00",
+             "Monday, January 5, 2099, 12:00 AM-12:00 PM Mountain Time"),
+            ("2099-07-11", "09:10", "17:45",
+             "Saturday, July 11, 2099, 9:10 AM-5:45 PM Mountain Time"),
+        ):
+            with self.subTest(date=date_value):
+                self.assertEqual(
+                    self.module.format_sms_schedule(date_value, start, end), expected
+                )
 
     def test_invalid_entries_are_rejected_without_writes(self):
         cases = [
@@ -625,8 +663,7 @@ class ApiTests(unittest.TestCase):
             self.login()
 
     def test_security_headers_on_pages_assets_api_and_errors(self):
-        for url in ("/", "/project-info.html", "/privacy", "/terms", "/sms-consent",
-                    "/assets/Screenshot%202026-11-03%20203341.png", "/js/script.js", "/styles.css",
+        for url in ("/", "/project-info.html", "/privacy", "/terms", "/js/script.js", "/styles.css",
                     "/api/health", "/missing-asset"):
             with self.client.get(url) as response:
                 policy = response.headers["Content-Security-Policy"]
@@ -669,33 +706,6 @@ class ApiTests(unittest.TestCase):
             signup = response.get_data(as_text=True)
         self.assertIn('href="/privacy"', signup)
         self.assertIn('href="/terms"', signup)
-        self.assertIn('href="/sms-consent"', signup)
-
-    def test_sms_consent_page_and_example_are_public(self):
-        image_url = "/assets/Screenshot%202026-11-03%20203341.png"
-        with self.client.get("/sms-consent") as response:
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.mimetype, "text/html")
-            html = response.get_data(as_text=True)
-        for content in (
-            "<h1>SMS Reminder Consent</h1>", "<strong>Joseph Anderson</strong>",
-            "one automated text reminder", "not required to volunteer",
-            "Message and data rates may apply", "Reply STOP", "HELP",
-            "unchecked by default", 'href="/privacy"', 'href="/terms"',
-            f'src="{image_url}"', 'href="/project-info.html#questions"',
-        ):
-            self.assertIn(content, html)
-        with self.client.get(image_url) as response:
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.mimetype, "image/png")
-            screenshot = Path(self.module.ROOT_DIR) / "assets" / "Screenshot 2026-11-03 203341.png"
-            self.assertEqual(response.get_data(), screenshot.read_bytes())
-        for url in ("/assets/other.png", "/assets/../app.py", "/volunteer_app.db"):
-            with self.subTest(url=url), self.client.get(url) as response:
-                self.assertEqual(response.status_code, 404)
-        for url in ("/privacy", "/terms"):
-            with self.subTest(url=url), self.client.get(url) as response:
-                self.assertIn('href="/sms-consent"', response.get_data(as_text=True))
 
     def test_login_throttling_persists_and_expires(self):
         now = time.time()
