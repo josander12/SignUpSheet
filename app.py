@@ -198,7 +198,7 @@ def send_signup_sms(entry):
     schedule = format_sms_schedule(entry["date"], entry["start"], entry["end"])
     message_body = (
         f"Joseph Anderson for JimenezHomeBuild: New volunteer signup! {entry['name'][:50]} signed up for "
-        f"{'Child care' if entry['type'] == 'childcare' else 'General'} assistance on"
+        f"{'child care' if entry['type'] == 'childcare' else 'housebuilding help'} on "
         f"{schedule}."
     )
     send_twilio_sms(os.environ["SMS_ALERT_PHONE"], message_body)

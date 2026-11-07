@@ -405,10 +405,23 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(data["From"], ["+18015550100"])
         self.assertEqual(
             data["Body"][0],
-            "Jimenez Home Build new volunteer: Test Volunteer - General, "
-            "Monday, January 5, 2099, 11:45 AM-12:45 PM Mountain Time.",
+            "Joseph Anderson for JimenezHomeBuild: New volunteer signup! Test Volunteer "
+            "signed up for housebuilding help on Monday, January 5, 2099, "
+            "11:45 AM-12:45 PM Mountain Time.",
         )
         self.assertNotIn(self.entry["contact"], data["Body"][0])
+
+    def test_childcare_signup_alert_uses_childcare_wording(self):
+        with patch.dict(os.environ, {"SMS_ALERT_PHONE": "+18015550101"}), patch.object(
+            self.module, "send_twilio_sms"
+        ) as send:
+            self.module.send_signup_sms({**self.entry, "type": "childcare"})
+        send.assert_called_once_with(
+            "+18015550101",
+            "Joseph Anderson for JimenezHomeBuild: New volunteer signup! Test Volunteer "
+            "signed up for child care on Monday, January 5, 2099, "
+            "11:45 AM-12:45 PM Mountain Time.",
+        )
 
     def test_sms_schedule_format_handles_seasons_and_noon_midnight(self):
         for date_value, start, end, expected in (
